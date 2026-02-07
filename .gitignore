@@ -30,6 +30,9 @@ out/
 *.swo
 *~
 
+# Cursor
+.cursor/debug.log
+
 # OS
 .DS_Store
 Thumbs.db
