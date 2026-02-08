@@ -1,0 +1,40 @@
+# National Address Platform - Local Development Services
+# Usage: docker compose up -d
+# This provides PostgreSQL+PostGIS and Redis for the mes-adresses-api backend.
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: nap-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: nap
+      POSTGRES_PASSWORD: nap_dev_password
+      POSTGRES_DB: nap
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nap"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: nap-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  redisdata:
