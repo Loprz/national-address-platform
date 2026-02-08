@@ -1,6 +1,6 @@
 # Audit Report: National Address Platform (NAP) Port
 
-## Summary — Frontend + Backend + GERS + Overture Bulk Import + City-Level + TIGER Boundaries + Deep Translation
+## Summary — Frontend + Backend + GERS + Overture Bulk Import + City-Level + TIGER Boundaries + Deep Translation + Authentication + Parcel Data
 - **Frontend (mes-adresses)**: Fully ported — 700+ French strings translated, map config swapped, legal pages rewritten, data model terms updated, i18n configured (en/es)
 - **Backend API (mes-adresses-api)**: Core porting complete — FIPS code system replaces French COG, 60+ French strings translated, S3/BAN services made resilient for local dev
 - **Overture Maps Bulk Import**: Full pipeline — DuckDB S3 reader → `POST /overture/import` endpoint → bulk LAB creation with GERS IDs; Fresno County demo: 49,970 addresses, 1,656 streets, 100% GERS coverage in 39 seconds
@@ -367,6 +367,8 @@ The Global Entity Reference System (GERS) is Overture Maps Foundation's universa
 2. **NAP → Overture**: Export certified addresses with GERS IDs for contribution back to Overture
 3. **Quality Feedback**: When a local authority corrects an address with a GERS ID, the correction can propagate
 
+**Regrid + GERS**: [Regrid](https://regrid.com) has integrated GERS IDs into their nationwide parcel data (Regrid ID ↔ GERS ID bridge). Using Regrid parcels (API/Tiles or [ArcGIS item](https://regrid.maps.arcgis.com/home/item.html?id=a2050b09baff493aa4ad7848ba2fac00)) alongside NAP’s Overture-derived addresses keeps parcel and address data in the same ID ecosystem for easier joins and enrichment.
+
 ### Data Model
 
 | Entity | GERS Field | DB Column | Purpose |
@@ -446,13 +448,59 @@ The Global Entity Reference System (GERS) is Overture Maps Foundation's universa
 - `NEXT_PUBLIC_BAL_API_URL=http://localhost:5050/v2` (points to local API)
 - `NEXT_PUBLIC_MAP_TILES_URL=https://tiles.stadiamaps.com/styles/osm_bright.json`
 - `NEXT_PUBLIC_MAP_GLYPHS_URL=https://tiles.stadiamaps.com/fonts/{fontstack}/{range}.pbf`
+- `NEXT_PUBLIC_ORTHO_TILES_URL=` — aerial imagery for the “Aerial photography” style; default is Esri World Imagery. **[Hexagon statewide imagery](https://www.arcgis.com/home/item.html?id=5d05c963793349b2839ae0181af8cd20)** can be used by setting this to the layer’s tile URL from the ArcGIS item REST endpoint; optionally set `NEXT_PUBLIC_ORTHO_ATTRIBUTION` for Hexagon.
+- `NEXT_PUBLIC_PARCEL_TILES_URL=` (set to Regrid, ATTOM, or county-specific tile URL)
+- `NEXT_PUBLIC_PARCEL_TILES_TYPE=vector` (or `raster` for PNG tile services)
+- `NEXT_PUBLIC_PARCEL_PROMOTE_ID=ll_uuid` (feature ID field for vector tiles)
+
+## US Parcel Data Integration (Phase 10)
+
+### Architecture
+The French cadastre (national parcel registry) was deeply integrated into the original BAN system, providing:
+- Vector tile parcel boundaries for map display
+- Parcel selection when associating addresses with land parcels
+- Hover/highlight interaction for parcel identification
+
+For the US version, parcel data is **configurable per deployment** via environment variables. The system supports:
+
+1. **Regrid** (recommended) — nationwide vector tiles (158M+ parcels, 3,200+ counties)
+   - Free for government/civic use via their [Data With Purpose](https://regrid.com/purpose) program
+   - **Regrid Parcel API & Tiles**: `https://tiles.regrid.com/api/v1/parcels/{z}/{x}/{y}.mvt?token=TOKEN`
+   - **Regrid via ArcGIS**: Nationwide parcel layer available as an [ArcGIS Online item](https://regrid.maps.arcgis.com/home/item.html?id=a2050b09baff493aa4ad7848ba2fac00); use the layer’s MapServer tile URL (e.g. from the item’s REST endpoint) with `NEXT_PUBLIC_PARCEL_TILES_TYPE=raster` if consuming as raster tiles
+   - Properties: `apn` (assessor's parcel number), `address`, `geoid`, `ll_uuid` (Regrid ID)
+   - **GERS ID alignment**: Regrid has integrated [Overture Maps Foundation GERS IDs](https://regrid.com/blog/introducing-enhanced-land-use-insights-through-the-regrid-id-and-overture-maps-foundations-gers-id-matchst-title-here) into their parcel data (Regrid ID ↔ GERS ID bridge). NAP already uses GERS on address points from Overture bulk import, so parcel–address linkage and data interoperability align across the stack.
+
+2. **ATTOM Data** — nationwide raster PNG tiles
+   - URL format: `https://api.gateway.attomdata.com/parcels/v1/tiles/{z}/{x}/{y}.png?apikey=KEY`
+
+3. **County-specific GIS services** — many counties publish parcel WMS/tile layers
+   - Example: Fresno County ArcGIS MapServer
+
+### Changes Made
+| File | Change |
+|------|--------|
+| `mes-adresses/src/components/map/layers/parcels.ts` | **New** — US parcel layer definitions with vector + raster support |
+| `mes-adresses/src/components/map/map.tsx` | Dynamic `<Source>/<Layer>` for parcel tiles; removed baked-in cadastre style |
+| `mes-adresses/src/contexts/map.tsx` | `isCadastreDisplayed` → `isParcelsDisplayed` |
+| `mes-adresses/src/contexts/parcelles.tsx` | Rewritten for US parcels; removed French commune-based filtering |
+| `mes-adresses/src/components/map/controls/cadastre-control.tsx` | Rewritten as `ParcelControl` — toggles based on tile availability |
+| `mes-adresses/src/components/map/controls/style-control.tsx` | Updated to use `isParcelsDisplayed` / `handleParcelsToggle` |
+| `mes-adresses/src/components/map/hooks/hovered.ts` | Updated source references from `"cadastre"` to `"parcels"` |
+| `mes-adresses/src/components/bal/numero-editor.tsx` | `hasCadastre` → `hasParcels` |
+| `mes-adresses/src/components/bal/toponyme-editor.tsx` | `hasCadastre` → `hasParcels` |
+| `mes-adresses/src/components/bal/numero-editor/select-parcelles.tsx` | Uses new `isParcelsDisplayed` state |
+| `mes-adresses/src/components/signalement/hooks/useSignalementCadastre.tsx` | Updated to use `setIsParcelsDisplayed` |
+| `mes-adresses/src/lib/openapi-api-bal/models/CommuneDTO.ts` | `hasCadastre` → `hasParcels`; `codeCommunesCadastre` deprecated |
+| `mes-adresses-api/.../commune.service.ts` | Returns `hasParcels: true` |
+| `mes-adresses-api/.../commune.dto.ts` | `hasCadastre` → `hasParcels` |
+| `mes-adresses/.env` | Added parcel tile env vars with documentation |
 
 ## Remaining Infrastructure Work
 1. ~~**Connect frontend to backend** — verify full CRUD flow (create LAB, add streets, add numbers)~~ ✅ DONE
 2. ~~**Overture Maps bulk import** — build GeoParquet reader to bulk-import county/city address data with GERS IDs~~ ✅ DONE
 3. ~~**US Census TIGER boundary tiles** — enable county/city/state boundary layers on the map~~ ✅ DONE
-4. **Authentication system** — adapt authorization flow for US jurisdiction verification (city and county level)
-5. **Parcel data source** — integrate US county parcel tile data
+4. ~~**Authentication system** — adapt authorization flow for US jurisdiction verification (city and county level)~~ ✅ DONE
+5. ~~**Parcel data source** — integrate US county parcel tile data~~ ✅ DONE
 6. ~~**PDF templates** — translate French legal document templates to US equivalents~~ ✅ DONE
 7. ~~**Email templates** — translate Handlebars email templates to English~~ ✅ DONE
 8. ~~**City/town-level jurisdictions** — extend from county-only to city+county granularity (28,254 places)~~ ✅ DONE
