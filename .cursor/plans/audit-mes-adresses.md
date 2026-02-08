@@ -1,13 +1,15 @@
 # Audit Report: National Address Platform (NAP) Port
 
-## Summary — Frontend + Backend + GERS Integration + E2E Verified + Deep Translation + City-Level Support
+## Summary — Frontend + Backend + GERS + Overture Bulk Import + City-Level + TIGER Boundaries + Deep Translation
 - **Frontend (mes-adresses)**: Fully ported — 700+ French strings translated, map config swapped, legal pages rewritten, data model terms updated, i18n configured (en/es)
 - **Backend API (mes-adresses-api)**: Core porting complete — FIPS code system replaces French COG, 60+ French strings translated, S3/BAN services made resilient for local dev
+- **Overture Maps Bulk Import**: Full pipeline — DuckDB S3 reader → `POST /overture/import` endpoint → bulk LAB creation with GERS IDs; Fresno County demo: 49,970 addresses, 1,656 streets, 100% GERS coverage in 39 seconds
 - **City/Town-Level Addressing**: System now supports both city/town-level (7-digit place FIPS) and county-level (5-digit county FIPS) jurisdictions — 28,254 incorporated places + 3,235 counties
+- **TIGER Boundary Layers**: US Census TIGER boundary tiles integrated — state, county, and city/town boundary overlays via TIGERweb WMS, toggleable per layer
 - **Email Templates**: All 6 Handlebars email templates translated to English (creation, publication, recovery, admin invite, token renewal)
 - **PDF Templates**: All 3 PDF generators translated (street numbering order, address certificate); date locale changed from fr-Fr to en-US
 - **Overture Maps / GERS**: Full integration — GERS IDs on all entities, bidirectional API, spatial matching, CSV export with GERS column
-- **Local Dev Environment**: Docker Compose with PostgreSQL+PostGIS and Redis, API running on port 5050, 14 DB migrations applied
+- **Local Dev Environment**: Docker Compose with PostgreSQL+PostGIS and Redis, API running on port 5050, 15 DB migrations applied
 - **Frontend ↔ Backend E2E**: Fully verified — jurisdiction search, LAB creation wizard, street/number CRUD all working through the browser
 
 ## City/Town-Level Jurisdiction Support (Phase 8)
@@ -56,6 +58,129 @@ The French BAN system maps to "communes" — which are city/town-level entities 
 ### Display Format
 - **Places**: "Los Angeles city, CA — Los Angeles County" (name, state, parent county)
 - **Counties**: "Los Angeles County, CA (county)"
+
+## US Census TIGER Boundary Tiles (Phase 9)
+
+### Integration
+Integrated US Census Bureau TIGERweb WMS service to provide administrative boundary overlays on the map. Boundaries are served as raster WMS tiles from the Census Bureau — zero infrastructure required.
+
+### Service
+- **TIGERweb WMS**: `https://tigerweb.geo.census.gov/arcgis/services/TIGERweb/tigerWMS_Current/MapServer/WMSServer`
+- Free, authoritative, maintained by the Census Bureau
+- Uses `{bbox-epsg-3857}` MapLibre raster tile protocol
+
+### Boundary Layers
+
+| Layer | WMS Layers | Min Zoom | Max Zoom | Content |
+|-------|-----------|----------|----------|---------|
+| **State boundaries** | 12, 13 | 2 | 10 | State boundary lines + state name labels |
+| **County boundaries** | 10, 11 | 6 | 14 | County boundary lines + county name labels |
+| **City/town boundaries** | 48, 49 | 8 | 16 | Incorporated place boundaries + place name labels |
+
+### UI Control
+- Globe icon button in the right-side map controls
+- Click to open a dropdown panel with three checkboxes (one per layer)
+- Default state: counties and city/towns enabled, states disabled
+- Icon turns blue when any layer is active, gray when all are off
+- Click outside to dismiss the panel
+
+### Files Created/Modified
+
+| File | Change |
+|------|--------|
+| `mes-adresses/src/components/map/layers/boundaries.ts` | **New** — Boundary source/layer config, WMS tile URL builder |
+| `mes-adresses/src/components/map/controls/boundary-control.tsx` | **New** — Toggle control UI with checkbox panel |
+| `mes-adresses/src/components/map/map.tsx` | Added boundary Source/Layer components inside MapGl |
+| `mes-adresses/src/contexts/map.tsx` | Added `boundaryVisibility` state and `BoundaryVisibility` type |
+| `mes-adresses/src/components/map/styles/index.ts` | Cleaned up old commented-out boundary placeholders |
+
+### Verified
+- State boundaries visible at zoom 2-10 with state abbreviation labels
+- County boundaries visible at zoom 6-14 with county name labels (verified over LA area)
+- City/town boundaries visible at zoom 8-16 with place name labels
+- All layers render semi-transparently (70% opacity) over both aerial and vector base maps
+- Toggle control works correctly — each layer can be independently enabled/disabled
+
+## Overture Maps Bulk Import (Phase 10)
+
+### Architecture
+Built a complete pipeline to bulk-import Overture Maps address data into the National Address Platform:
+
+1. **Data Extraction**: Python script uses DuckDB to query Overture's GeoParquet files directly from S3 (no download needed) with spatial bounding box filtering
+2. **API Endpoint**: `POST /v2/overture/import` accepts up to 100MB JSON payloads with address arrays
+3. **Bulk Insert**: Service creates LAB → groups addresses by street → bulk-inserts Voies → bulk-inserts Numeros with Positions → calculates Voie centroids
+
+### Data Source
+- **Overture Maps Release**: 2026-01-21.0
+- **S3 Bucket**: `s3://overturemaps-us-west-2/release/2026-01-21.0/theme=addresses/type=address/`
+- **Format**: GeoParquet (queried via DuckDB with spatial + httpfs extensions)
+- **Schema**: `id` (GERS UUID), `geometry` (Point), `street`, `number`, `unit`, `postcode`, `country`, `address_levels`, `sources`
+
+### Fresno County Demo Import
+| Metric | Value |
+|--------|-------|
+| **Total input** | 50,000 |
+| **Addresses imported** | 49,970 |
+| **Streets created** | 1,656 |
+| **GERS IDs linked** | 49,970 (100%) |
+| **Skipped** | 30 (invalid numbers) |
+| **Import time** | 39 seconds |
+| **Source dataset** | OpenAddresses/CA/Fresno County |
+
+### API Endpoint
+```
+POST /v2/overture/import
+Content-Type: application/json
+
+{
+  "fipsCode": "06019",
+  "email": "admin@fresnocounty.gov",
+  "addresses": [
+    {
+      "gersId": "8ff0f103-e029-4103-9702-a331016decca",
+      "longitude": -119.5542956,
+      "latitude": 36.8965161,
+      "country": "US",
+      "postcode": "93619",
+      "street": "MENDOCINO AVE",
+      "number": "10761",
+      "sources": [{"dataset": "OpenAddresses/CA/Fresno County"}]
+    }
+  ]
+}
+```
+
+### Import Script
+```bash
+# Import from Overture S3 directly
+python3 scripts/import-overture.py --fips 06019 --limit 50000
+
+# Import from pre-downloaded JSON
+python3 scripts/import-overture.py --fips 06019 --file overture-fresno-county-addresses.json
+
+# Dry run (download only)
+python3 scripts/import-overture.py --fips 06019 --limit 1000 --dry-run --save-json test.json
+```
+
+### Files Created/Modified
+
+| File | Change |
+|------|--------|
+| `mes-adresses-api/libs/shared/src/modules/overture/overture.service.ts` | Added `bulkImportFromOverture()` method with street grouping, bulk insert, centroid calculation |
+| `mes-adresses-api/libs/shared/src/modules/overture/overture.module.ts` | Added BaseLocale and Position entity imports |
+| `mes-adresses-api/libs/shared/src/modules/overture/overture.types.ts` | Added `OvertureAddressInput` and `OvertureBulkImportResult` types |
+| `mes-adresses-api/apps/api/src/modules/overture/overture.controller.ts` | Added `POST /overture/import` endpoint |
+| `mes-adresses-api/apps/api/src/modules/overture/dto/bulk_import.dto.ts` | **New** — DTO with validation for bulk import payload |
+| `mes-adresses-api/apps/api/src/main.ts` | Increased JSON body limit to 100MB for bulk imports |
+| `mes-adresses-api/scripts/import-overture.py` | **New** — Python CLI script for downloading and importing Overture data |
+
+### Verified
+- GERS reverse lookup works: `GET /v2/overture/gers/{gersId}` → returns NAP address with street, number, position
+- GERS stats: `GET /v2/overture/stats/{balId}` → 49,970 addresses, 100% coverage
+- LAB loads in frontend editor with 1,656 streets listed, paginated
+- Map zooms to Fresno County showing imported address points over aerial imagery
+- Address numbers with suffixes (e.g., "123A") correctly parsed into number + suffix fields
+- Pre-built bounding boxes for major counties (Fresno, LA, San Diego, Santa Clara, Harris, Cook, Maricopa)
 
 ## Email Templates Translation (Phase 7)
 
@@ -324,8 +449,8 @@ The Global Entity Reference System (GERS) is Overture Maps Foundation's universa
 
 ## Remaining Infrastructure Work
 1. ~~**Connect frontend to backend** — verify full CRUD flow (create LAB, add streets, add numbers)~~ ✅ DONE
-2. **Overture Maps bulk import** — build GeoParquet reader to bulk-import county/city address data with GERS IDs
-3. **US Census TIGER boundary tiles** — enable county/city/state boundary layers on the map
+2. ~~**Overture Maps bulk import** — build GeoParquet reader to bulk-import county/city address data with GERS IDs~~ ✅ DONE
+3. ~~**US Census TIGER boundary tiles** — enable county/city/state boundary layers on the map~~ ✅ DONE
 4. **Authentication system** — adapt authorization flow for US jurisdiction verification (city and county level)
 5. **Parcel data source** — integrate US county parcel tile data
 6. ~~**PDF templates** — translate French legal document templates to US equivalents~~ ✅ DONE
