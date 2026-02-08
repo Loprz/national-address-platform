@@ -1,13 +1,61 @@
 # Audit Report: National Address Platform (NAP) Port
 
-## Summary — Frontend + Backend + GERS Integration + E2E Verified + Deep Translation
+## Summary — Frontend + Backend + GERS Integration + E2E Verified + Deep Translation + City-Level Support
 - **Frontend (mes-adresses)**: Fully ported — 700+ French strings translated, map config swapped, legal pages rewritten, data model terms updated, i18n configured (en/es)
 - **Backend API (mes-adresses-api)**: Core porting complete — FIPS code system replaces French COG, 60+ French strings translated, S3/BAN services made resilient for local dev
+- **City/Town-Level Addressing**: System now supports both city/town-level (7-digit place FIPS) and county-level (5-digit county FIPS) jurisdictions — 28,254 incorporated places + 3,235 counties
 - **Email Templates**: All 6 Handlebars email templates translated to English (creation, publication, recovery, admin invite, token renewal)
 - **PDF Templates**: All 3 PDF generators translated (street numbering order, address certificate); date locale changed from fr-Fr to en-US
 - **Overture Maps / GERS**: Full integration — GERS IDs on all entities, bidirectional API, spatial matching, CSV export with GERS column
-- **Local Dev Environment**: Docker Compose with PostgreSQL+PostGIS and Redis, API running on port 5050, 13 DB migrations applied
+- **Local Dev Environment**: Docker Compose with PostgreSQL+PostGIS and Redis, API running on port 5050, 14 DB migrations applied
 - **Frontend ↔ Backend E2E**: Fully verified — jurisdiction search, LAB creation wizard, street/number CRUD all working through the browser
+
+## City/Town-Level Jurisdiction Support (Phase 8)
+
+### Architecture Change
+The French BAN system maps to "communes" — which are city/town-level entities (~35,000 in France). The initial US port used county-level FIPS codes (5-digit, ~3,235 entries), but US addressing authority is typically at the city/town/municipality level. This phase extends the system to support both granularities:
+
+| Level | FIPS Format | Count | Example | Use Case |
+|-------|------------|-------|---------|----------|
+| **Place** (city/town) | 7-digit | 28,254 | `0644000` = Los Angeles city, CA | Incorporated areas — primary addressing authority |
+| **County** | 5-digit | 3,235 | `06037` = Los Angeles County, CA | Unincorporated areas — fallback addressing authority |
+
+### Data Source
+- **Census Bureau National Places File**: 41,415 total entries from `https://www2.census.gov/geo/docs/reference/codes/files/national_places.txt`
+- Filtered to 28,254 active incorporated places (cities: 10,147, towns: 7,910, villages: 3,768, boroughs: 1,221, other places: 5,208)
+- Census Designated Places (CDPs) excluded as they are statistical, not administrative
+- Each place includes parent county linkage (single county or multi-county for large cities)
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `mes-adresses-api/us-fips-data.json` | Added `places` section with 28,254 incorporated place entries (~4.5 MB) |
+| `mes-adresses-api/libs/shared/src/utils/fips.utils.ts` | Added `USPlace` type, `getPlace()`, `getAllPlaces()`, `getPlacesByState()`, `getPlacesByCounty()` functions; updated `Jurisdiction` type to include `level` field; updated `searchJurisdictions()` to return both places and counties with smart ranking; updated `getJurisdictionName()` to handle place codes |
+| `mes-adresses-api/libs/shared/src/validators/cog.validator.ts` | Updated `isValidJurisdiction()` to accept 7-digit place codes; updated error message |
+| `mes-adresses-api/libs/shared/src/entities/base_locale.entity.ts` | Widened `commune` column from `varchar(5)` to `varchar(7)` |
+| `mes-adresses-api/libs/shared/src/entities/numero.entity.ts` | Widened `communeDeleguee` column from `varchar(5)` to `varchar(7)` |
+| `mes-adresses-api/libs/shared/src/entities/toponyme.entity.ts` | Widened `communeDeleguee` column from `varchar(5)` to `varchar(7)` |
+| `mes-adresses-api/migrations/1770000000000-widen_commune_for_place_fips.ts` | Migration to widen all commune/jurisdiction columns to accommodate 7-digit place FIPS |
+| `mes-adresses-api/apps/api/src/modules/base_locale/sub_modules/commune/dto/commune.dto.ts` | Added `level`, `type`, and `countyName` fields to DTO |
+| `mes-adresses-api/apps/api/src/modules/base_locale/sub_modules/commune/commune.service.ts` | Returns `level`, `type`, and `countyName` in jurisdiction data |
+| `mes-adresses-api/apps/api/src/modules/base_locale/sub_modules/commune/commune.controller.ts` | Updated API docs to reflect city+county search |
+| `mes-adresses/src/lib/openapi-api-bal/models/CommuneDTO.ts` | Added `level`, `type`, `countyName` fields |
+| `mes-adresses/src/lib/geo-api/type.ts` | Added `level`, `type`, `countyName` to search result type |
+| `mes-adresses/src/components/commune-search/commune-search.tsx` | Updated autocomplete to display city vs county with parent county info |
+| `mes-adresses/src/components/new/steps/search-commune-step.tsx` | Updated label and placeholder to "Search for a city, town, or county" |
+
+### Search Behavior
+- **City search**: "Los Angeles" → Los Angeles city, CA (ranked first), then Los Angeles County, CA
+- **State-scoped**: "Ashland OR" → Ashland city, OR
+- **Exact FIPS**: "0644000" → Los Angeles city, CA
+- **County fallback**: "Cook IL" → Cook County, IL (plus cities in Cook County)
+- Cities/towns are ranked higher than counties since they are the primary US addressing authority
+- County results are shown for unincorporated area addressing
+
+### Display Format
+- **Places**: "Los Angeles city, CA — Los Angeles County" (name, state, parent county)
+- **Counties**: "Los Angeles County, CA (county)"
 
 ## Email Templates Translation (Phase 7)
 
@@ -276,9 +324,10 @@ The Global Entity Reference System (GERS) is Overture Maps Foundation's universa
 
 ## Remaining Infrastructure Work
 1. ~~**Connect frontend to backend** — verify full CRUD flow (create LAB, add streets, add numbers)~~ ✅ DONE
-2. **Overture Maps bulk import** — build GeoParquet reader to bulk-import county address data with GERS IDs
-3. **US Census TIGER boundary tiles** — enable county/state layers on the map
-4. **Authentication system** — adapt authorization flow for US jurisdiction verification
+2. **Overture Maps bulk import** — build GeoParquet reader to bulk-import county/city address data with GERS IDs
+3. **US Census TIGER boundary tiles** — enable county/city/state boundary layers on the map
+4. **Authentication system** — adapt authorization flow for US jurisdiction verification (city and county level)
 5. **Parcel data source** — integrate US county parcel tile data
 6. ~~**PDF templates** — translate French legal document templates to US equivalents~~ ✅ DONE
 7. ~~**Email templates** — translate Handlebars email templates to English~~ ✅ DONE
+8. ~~**City/town-level jurisdictions** — extend from county-only to city+county granularity (28,254 places)~~ ✅ DONE
