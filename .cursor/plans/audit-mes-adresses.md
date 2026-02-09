@@ -466,7 +466,7 @@ For the US version, parcel data is **configurable per deployment** via environme
 1. **Regrid** (recommended) — nationwide vector tiles (158M+ parcels, 3,200+ counties)
    - Free for government/civic use via their [Data With Purpose](https://regrid.com/purpose) program
    - **Regrid Parcel API & Tiles**: `https://tiles.regrid.com/api/v1/parcels/{z}/{x}/{y}.mvt?token=TOKEN`
-   - **Regrid via ArcGIS**: Nationwide parcel layer available as an [ArcGIS Online item](https://regrid.maps.arcgis.com/home/item.html?id=a2050b09baff493aa4ad7848ba2fac00); use the layer’s MapServer tile URL (e.g. from the item’s REST endpoint) with `NEXT_PUBLIC_PARCEL_TILES_TYPE=raster` if consuming as raster tiles
+   - **Regrid free ArcGIS MapServer** (no API key): [Regrid_Nationwide_Parcel_Boundaries_v1](https://tiles.arcgis.com/tiles/KzeiCaQsMoeCfoCq/arcgis/rest/services/Regrid_Nationwide_Parcel_Boundaries_v1/MapServer) — free tile layer, 100% US coverage; tiles at zoom 15–17 only. Set `NEXT_PUBLIC_PARCEL_TILES_URL` to `.../MapServer/tile/{z}/{y}/{x}` and `NEXT_PUBLIC_PARCEL_TILES_TYPE=raster`.
    - Properties: `apn` (assessor's parcel number), `address`, `geoid`, `ll_uuid` (Regrid ID)
    - **GERS ID alignment**: Regrid has integrated [Overture Maps Foundation GERS IDs](https://regrid.com/blog/introducing-enhanced-land-use-insights-through-the-regrid-id-and-overture-maps-foundations-gers-id-matchst-title-here) into their parcel data (Regrid ID ↔ GERS ID bridge). NAP already uses GERS on address points from Overture bulk import, so parcel–address linkage and data interoperability align across the stack.
 
