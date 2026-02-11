@@ -15,6 +15,8 @@ You will create **one Railway project** with **four services**:
 
 The API and Frontend are deployed from their **own Git repos** (or from the same repo with two services and different root directories). Postgres and Redis are added from the Railway dashboard.
 
+**Railway CLI:** For running migrations, viewing logs, and managing variables from your machine, use the [Railway CLI](https://docs.railway.com/cli). Install with `brew install railway` or `npm i -g @railway/cli`, then `railway login` and `railway link` in your repo.
+
 ---
 
 ## 1. Create a Railway project
@@ -24,18 +26,16 @@ The API and Frontend are deployed from their **own Git repos** (or from the same
 
 ---
 
-## 2. Add Postgres and Redis
+## 2. Add Postgres (PostGIS) and Redis
 
-1. In the project, click **+ New** → **Database** → **PostgreSQL**.
-2. After it’s created, open the Postgres service → **Variables** and note the `DATABASE_URL` (Railway may name it `POSTGRES_URL` or `DATABASE_URL`; the API expects `POSTGRES_URL` — see step 4).
+The API uses **PostGIS** for geometry (e.g. `positions.point`). Railway’s default PostgreSQL image does **not** include PostGIS, so you must use the **PostGIS** template.
+
+1. In the project, click **+ New** → **Database** → open **Templates** and choose **PostGIS** (not the plain “PostgreSQL” option). If you don’t see PostGIS under Database, use **+ New** → **Template** and search for “PostGIS”.
+2. After it’s created, open the Postgres service → **Variables** and note the `DATABASE_URL` (or `POSTGRES_URL`; the API expects `POSTGRES_URL` — see step 4).
 3. Click **+ New** → **Database** → **Redis**.
 4. Note the Redis connection URL for the next step.
 
-(Optional) Enable **PostGIS** on Postgres: in the Postgres service, open the **Data** or **Query** tab and run:
-
-```sql
-CREATE EXTENSION IF NOT EXISTS postgis;
-```
+If you already created a **plain PostgreSQL** service, migrations will fail with `extension "postgis" is not available`. Create a new **PostGIS** database from the template, copy its public `DATABASE_URL`, run migrations against that URL, then point the API’s `POSTGRES_URL` to the new PostGIS database and remove or ignore the old Postgres service.
 
 ---
 
@@ -52,8 +52,8 @@ CREATE EXTENSION IF NOT EXISTS postgis;
    - `PORT` is usually set by Railway; the API uses it by default.
 5. **Deploy**. After the first successful deploy, open the API service → **Settings** → **Networking** → **Generate Domain** to get the public URL. Set `API_URL` and `EDITOR_URL_PATTERN` to use this URL and your frontend URL, then redeploy if needed.
 6. **Run migrations** (one-time, or after adding new migrations):
-   - Railway CLI: `railway run yarn typeorm:migration:run -- -d ./typeorm.config.ts` (from the `mes-adresses-api` directory, with `railway link` to this project/service).
-   - Or from your machine with `POSTGRES_URL` set to the Railway Postgres URL: `yarn typeorm:migration:run -- -d ./typeorm.config.ts`.
+   - From your machine with the **public** Postgres URL: in Railway, open the **Postgres** service → **Variables** (or **Connect**) and copy the **public** `DATABASE_URL` (not the private `postgres.railway.internal` one). Then run `POSTGRES_URL='<paste-public-url>' yarn typeorm:migration:run` from `mes-adresses-api`. The private URL only works from inside Railway’s network (e.g. from a running deploy).
+   - Or use Railway CLI with the API service’s variables: `railway run yarn typeorm:migration:run` (from `mes-adresses-api`). If you see `ENOTFOUND postgres.railway.internal`, the injected URL is private — use the public URL as above. Do not add `-- -d ./typeorm.config.ts`; the script already passes it.
 
 ---
 
@@ -122,9 +122,54 @@ Then update `API_URL`, `EDITOR_URL_PATTERN`, `NEXT_PUBLIC_EDITEUR_URL`, and `NEX
 
 ---
 
-## 8. Troubleshooting
+## 8. Using the Railway API (optional)
 
+You can automate part of the setup with the [Railway GraphQL API](https://docs.railway.com/reference/public-api).
+
+1. **Create an API token**: [railway.app/account/tokens](https://railway.app/account/tokens) — use an **Account** or **Workspace** token (not a project token, so you can create projects and services).
+
+2. **Add Postgres and Redis first** in the dashboard (the API does not expose a simple “add database” flow for all plans; creating them in the UI is reliable).
+
+3. **Run the setup script** from the repo root (with your own env vars):
+
+   ```bash
+   export RAILWAY_TOKEN=your_token_here
+   export GITHUB_OWNER=your-github-org-or-username
+   export GITHUB_REPO_API=your-org/mes-adresses-api
+   export GITHUB_REPO_FRONTEND=your-org/mes-adresses
+   export GITHUB_BRANCH=us-port   # or main
+
+   # Optional: use an existing project instead of creating one
+   # export RAILWAY_PROJECT_ID=existing-project-id
+
+   # Optional: monorepo with subdirs
+   # export API_ROOT_DIR=mes-adresses-api
+   # export FRONTEND_ROOT_DIR=mes-adresses
+
+   node scripts/railway-setup.mjs
+   ```
+
+   The script will:
+   - Create a new project (or use `RAILWAY_PROJECT_ID` if set).
+   - Create **API** and **Frontend** services from your GitHub repos.
+   - Generate public domains for both.
+   - Set variables (API: `POSTGRES_URL`, `REDIS_URL`, `API_URL`, `EDITOR_URL_PATTERN`; Frontend: `NEXT_PUBLIC_EDITEUR_URL`, `NEXT_PUBLIC_BAL_API_URL`).
+   - Trigger the first deploy for both services.
+
+   **Important:** Variable references assume your Postgres and Redis services are named exactly **Postgres** and **Redis** in the project (e.g. `${{Postgres.DATABASE_URL}}`). If you used different names, set `POSTGRES_URL` and `REDIS_URL` in the API service in the dashboard after the script runs.
+
+4. **If the script fails**: Railway’s GraphQL schema can change. Use [railway.com/graphiql](https://railway.com/graphiql) with your token to inspect mutations (`projectCreate`, `serviceCreate`, `serviceDomainCreate`, `variableCollectionUpsert`, `deploymentTrigger`). You can also do the same steps manually in the dashboard (see sections 1–5 above).
+
+5. **Migrations**: After the first successful API deploy, run migrations once (see step 3 in the main guide).
+
+---
+
+## 9. Troubleshooting
+
+- **502 Bad Gateway** when opening the API URL: The app must listen on `0.0.0.0` so Railway’s proxy can reach it. The API’s `main.ts` uses `app.listen(port, '0.0.0.0')`. If you still see 502, confirm the **Start Command** is `node dist/apps/api/main.js` and that the latest deploy finished successfully (Deploy Logs show “Nest application successfully started”).
+- **"railway: command not found" / container crashes on start**: The container is trying to run the `railway` CLI, which only exists on your machine, not inside the deploy. Fix: open the API service in Railway → **Settings** → **Deploy** (or **Build & Deploy**). Clear any **Start Command** or **Pre-Deploy Command** that contains `railway run` or `railway`. The start command should be only `node dist/apps/api/main.js` (or leave it empty so `railway.toml` is used). Run migrations from your **local** machine with `railway run yarn typeorm:migration:run` (see step 6 in section 3).
 - **API fails to start**: Check that `POSTGRES_URL` and `REDIS_URL` are set and that migrations have been run at least once.
 - **Frontend can’t reach API**: Ensure `NEXT_PUBLIC_BAL_API_URL` is the **public** API URL (including `/v2`) and that the API service has a generated (or custom) domain.
 - **Links in emails point to wrong URL**: Set `EDITOR_URL_PATTERN` and `API_URL` on the API to the correct public frontend and API URLs.
 - **PostGIS errors**: Run `CREATE EXTENSION IF NOT EXISTS postgis;` in the Postgres database (see step 2).
+- **"type habilitations_status_enum already exists"**: The migration was made idempotent; run `yarn typeorm:migration:run` again (with the same `POSTGRES_URL`). If it still fails, the migration may already be recorded — check the `migrations` table in the DB.
