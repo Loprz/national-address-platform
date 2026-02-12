@@ -103,6 +103,36 @@ See [mes-adresses/.env.sample](../mes-adresses/.env.sample) for the full list.
 
 ---
 
+## 5b. Pre-launch checklist
+
+Use this to verify everything is set correctly (no automated check — run through in the Railway dashboard and browser).
+
+**API (`mes-adresses-api`)**
+
+| Check | What to verify |
+|-------|----------------|
+| **POSTGRES_URL** | Points to your **PostGIS** (or Postgres-with-PostGIS) database. Same host/URL as the service where you ran migrations (e.g. `shortline.proxy.rlwy.net` for PostGIS). Not the old plain Postgres if you have both. |
+| **REDIS_URL** | Set and uses the **private** Redis URL (e.g. `${{Redis.REDIS_URL}}` or `${{Redis.REDIS_PRIVATE_URL}}`). Avoid using the public Redis URL from outside Railway to prevent ETIMEDOUT and egress. |
+| **API_URL** | Your API’s **public** URL (e.g. `https://mes-adresses-api-production.up.railway.app`). |
+| **EDITOR_URL_PATTERN** | `https://<your-frontend-domain>/bal/<id>/<token>` with your real frontend domain. |
+| **Start command** | `node dist/apps/api/main.js` (no `railway run` or migration command). |
+| **Deploy status** | Latest deployment **Success**; Deploy Logs show “Nest application successfully started” and no Redis ETIMEDOUT. |
+
+**Frontend (`mes-adresses`)**
+
+| Check | What to verify |
+|-------|----------------|
+| **NEXT_PUBLIC_BAL_API_URL** | API public URL + `/v2` (e.g. `https://mes-adresses-api-production.up.railway.app/v2`). |
+| **NEXT_PUBLIC_EDITEUR_URL** | Your frontend’s **public** URL (e.g. `https://mes-adresses-production.up.railway.app`). |
+| **Deploy status** | Latest deployment **Success**. |
+
+**Smoke test**
+
+1. Open the **API** URL in a browser (e.g. `https://<api-domain>/` or `/v2`). You should get a response (e.g. 404 or JSON), not 502.
+2. Open the **frontend** URL. The app should load; try opening or creating a BAL so the frontend talks to the API.
+
+---
+
 ## 6. Custom domain (optional)
 
 For each service (API and Frontend):
@@ -169,6 +199,8 @@ You can automate part of the setup with the [Railway GraphQL API](https://docs.r
 - **502 Bad Gateway** when opening the API URL: The app must listen on `0.0.0.0` so Railway’s proxy can reach it. The API’s `main.ts` uses `app.listen(port, '0.0.0.0')`. If you still see 502, confirm the **Start Command** is `node dist/apps/api/main.js` and that the latest deploy finished successfully (Deploy Logs show “Nest application successfully started”).
 - **"railway: command not found" / container crashes on start**: The container is trying to run the `railway` CLI, which only exists on your machine, not inside the deploy. Fix: open the API service in Railway → **Settings** → **Deploy** (or **Build & Deploy**). Clear any **Start Command** or **Pre-Deploy Command** that contains `railway run` or `railway`. The start command should be only `node dist/apps/api/main.js` (or leave it empty so `railway.toml` is used). Run migrations from your **local** machine with `railway run yarn typeorm:migration:run` (see step 6 in section 3).
 - **API fails to start**: Check that `POSTGRES_URL` and `REDIS_URL` are set and that migrations have been run at least once.
+- **API_URL is localhost**: If `API_URL` is `http://localhost:5000`, the API will generate wrong links. Set it to your **public** API URL (e.g. `https://mes-adresses-api-production.up.railway.app`) in the API service Variables.
+- **Redis `connect ETIMEDOUT`** (in Deploy Logs): The API cannot reach Redis. Fix: (1) In **mes-adresses-api** → **Variables**, set **REDIS_URL** via the variable reference `${{Redis.REDIS_URL}}` so Railway links the services. (2) Ensure the **Redis** service is in the same Railway project and is **Online**. (3) The codebase forces IPv4 (`family: 4`) for Redis when the URL host is `railway.internal`; push the latest API code and redeploy. (4) **If it still fails:** use the **public** Redis URL so the API can start. In the **Redis** service → **Variables**, copy the value of **REDIS_PUBLIC_URL**. In **mes-adresses-api** → **Variables**, set **REDIS_URL** to that value (paste it, or use `${{Redis.REDIS_PUBLIC_URL}}` if available). Redeploy. This may incur egress but unblocks the 502.
 - **Frontend can’t reach API**: Ensure `NEXT_PUBLIC_BAL_API_URL` is the **public** API URL (including `/v2`) and that the API service has a generated (or custom) domain.
 - **Links in emails point to wrong URL**: Set `EDITOR_URL_PATTERN` and `API_URL` on the API to the correct public frontend and API URLs.
 - **PostGIS errors**: Run `CREATE EXTENSION IF NOT EXISTS postgis;` in the Postgres database (see step 2).
