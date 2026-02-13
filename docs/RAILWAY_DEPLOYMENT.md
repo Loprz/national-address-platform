@@ -60,13 +60,14 @@ If you already created a **plain PostgreSQL** service, migrations will fail with
 ## 4. Deploy the Frontend (`mes-adresses`)
 
 1. In the same project, **+ New** → **GitHub Repo** → select your `mes-adresses` repo.
-2. Railway will use the repo’s `railway.toml` for build/start.
-3. **Settings** → **Variables**: set at least:
+2. **Use the US port branch for English UI**: If you want the app in English (e.g. “My Addresses”, “Create a Local Address Base”), the service must build from the branch that has the US port (e.g. `us-port`). In the service **Settings** → **Build** (or **Source**), set the **Production Branch** (or **Branch**) to that branch. The default locale in that branch is `en`; the French upstream uses `fr`.
+3. Railway will use the repo’s `railway.toml` for build/start.
+4. **Settings** → **Variables**: set at least:
    - `NEXT_PUBLIC_EDITEUR_URL` = your frontend’s public URL (e.g. `https://mes-adresses-production.up.railway.app` — again, generate domain after first deploy).
    - `NEXT_PUBLIC_BAL_API_URL` = API base URL + `/v2` (e.g. `https://mes-adresses-api-production.up.railway.app/v2`).
    - Optionally set map/parcel/ortho vars (see **Environment variables** below).
-4. **Deploy** → then **Settings** → **Networking** → **Generate Domain**.
-5. Go back to the **API** service and set `EDITOR_URL_PATTERN` to use this frontend URL: `https://<frontend-domain>/bal/<id>/<token>`. Redeploy the API if you changed variables.
+5. **Deploy** → then **Settings** → **Networking** → **Generate Domain**.
+6. Go back to the **API** service and set `EDITOR_URL_PATTERN` to use this frontend URL: `https://<frontend-domain>/bal/<id>/<token>`. Redeploy the API if you changed variables.
 
 ---
 
