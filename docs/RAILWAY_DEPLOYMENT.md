@@ -99,8 +99,23 @@ See [mes-adresses-api/.env.sample](../mes-adresses-api/.env.sample) for the full
 | `NEXT_PUBLIC_MAP_GLYPHS_URL` | No | Default Stadia glyphs if unset |
 | `NEXT_PUBLIC_ORTHO_TILES_URL` | No | Optional aerial imagery |
 | `NEXT_PUBLIC_PARCEL_TILES_URL` | No | Optional parcel layer |
+| `HOME_DRAWER_NEWS_URL` | No | **US demo:** absolute URL returning JSON array of `{ id, message, date }`. When set, replaces Mattermost news. Example: `https://your-app.railway.app/demo/home-drawer-news.json` |
+| `HOME_DRAWER_EVENTS_URL` | No | **US demo:** absolute URL returning JSON array of events (same shape as [EventType](../mes-adresses/src/lib/bal-admin/type.ts)). When set, replaces bal-admin trainings. Example: `https://your-app.railway.app/demo/home-drawer-events.json` |
 
 See [mes-adresses/.env.sample](../mes-adresses/.env.sample) for the full list.
+
+**Home drawer – US demo (NAD / Census / Overture)**  
+To show news and events from American sources instead of the default French Mattermost and bal-admin:
+
+1. Set **`HOME_DRAWER_NEWS_URL`** to a URL that returns a JSON array of `{ id, message, date }` (or `{ news: [...] }`).  
+2. Set **`HOME_DRAWER_EVENTS_URL`** to a URL that returns a JSON array of events with at least `id`, `type`, `date`, `startHour`, `endHour`, `description` (and optionally `href` for the registration link).  
+
+The repo includes static demo payloads you can serve from the same app:
+
+- **News:** set `HOME_DRAWER_NEWS_URL` = `https://<your-frontend-domain>/demo/home-drawer-news.json`  
+- **Events:** set `HOME_DRAWER_EVENTS_URL` = `https://<your-frontend-domain>/demo/home-drawer-events.json`  
+
+Those files under `mes-adresses/public/demo/` contain placeholder content for **NAD**, **Census Bureau**, and **Overture Maps**. You can replace them or point the env vars at your own JSON endpoints (e.g. a small proxy to Census or Overture announcements).
 
 ---
 
