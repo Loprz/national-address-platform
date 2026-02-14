@@ -10,7 +10,7 @@ You will create **one Railway project** with **four services**:
 |-----------|---------------------|----------------------------|
 | **Postgres** | Railway plugin      | Database (PostGIS via extension) |
 | **Redis**    | Railway plugin      | Queues / cache for the API |
-| **API**      | `mes-adresses-api` | NestJS BAL API             |
+| **API**      | `mes-adresses-api` | NestJS BAL API (commune search, bases-locales, etc.). **Depot** (`api-depot/`) is a separate app and is **not** in this setup; see §5a to add it. |
 | **Frontend** | `mes-adresses`     | Next.js editor             |
 
 The API and Frontend are deployed from their **own Git repos** (or from the same repo with two services and different root directories). Postgres and Redis are added from the Railway dashboard.
@@ -101,6 +101,7 @@ See [mes-adresses-api/.env.sample](../mes-adresses-api/.env.sample) for the full
 | `NEXT_PUBLIC_PARCEL_TILES_URL` | No | Optional parcel layer |
 | `HOME_DRAWER_NEWS_URL` | No | **US demo:** absolute URL returning JSON array of `{ id, message, date }`. When set, replaces Mattermost news. Example: `https://your-app.railway.app/demo/home-drawer-news.json` |
 | `HOME_DRAWER_EVENTS_URL` | No | **US demo:** absolute URL returning JSON array of events (same shape as [EventType](../mes-adresses/src/lib/bal-admin/type.ts)). When set, replaces bal-admin trainings. Example: `https://your-app.railway.app/demo/home-drawer-events.json` |
+| `NEXT_PUBLIC_BAN_API_DEPOT` | No | **Depot only:** base URL of the depot service (e.g. `https://api-depot-xxx.up.railway.app`). If unset, the frontend derives a URL from `NEXT_PUBLIC_BAL_API_URL` + `/api-depot`, which only works when depot is served at that path (see **Depot** below). |
 
 See [mes-adresses/.env.sample](../mes-adresses/.env.sample) for the full list.
 
@@ -116,6 +117,36 @@ The repo includes static demo payloads you can serve from the same app:
 - **Events:** set `HOME_DRAWER_EVENTS_URL` = `https://<your-frontend-domain>/demo/home-drawer-events.json`  
 
 Those files under `mes-adresses/public/demo/` contain placeholder content for **NAD**, **Census Bureau**, and **Overture Maps**. You can replace them or point the env vars at your own JSON endpoints (e.g. a small proxy to Census or Overture announcements).
+
+---
+
+## 5a. Depot (BAL revision storage) – optional
+
+The **depot** is a separate app in this repo (`api-depot/`). It exposes:
+
+- `GET /communes/:codeCommune/current-revision`
+- `GET /communes/:codeCommune/revisions`
+
+The **four-service Railway setup** (Postgres, Redis, API, Frontend) does **not** include the depot. Only **mes-adresses-api** (the BAL API) is deployed as the API service; it does **not** serve depot routes. So:
+
+- The frontend can derive a depot URL from `NEXT_PUBLIC_BAL_API_URL` (e.g. `https://your-api.../api-depot`), but nothing in the current deployment serves `/api-depot`, so those requests **404**.
+- Defensive handling in the app (returning null/empty instead of throwing) keeps the app working when depot is unavailable.
+
+To **actually use** the depot for the US deployment, choose one of these:
+
+**Option 1 – Deploy api-depot as a fifth service**
+
+1. In the same Railway project, **+ New** → **GitHub Repo** → select the repo and set the **root directory** (or monorepo path) to **`api-depot`**.
+2. Configure build/start for the NestJS app (e.g. port 4242 or whatever `api-depot` uses; set `PORT` if needed).
+3. Generate a **public domain** for the api-depot service (e.g. `https://api-depot-xxx.up.railway.app`).
+4. In the **Frontend** service variables, set **`NEXT_PUBLIC_BAN_API_DEPOT`** = that URL (no `/api-depot` path; api-depot’s routes are at the root: `/communes/...`).
+5. Redeploy the frontend.
+
+**Option 2 – Add depot behind the same API**
+
+Add depot routes (or a reverse proxy to api-depot) inside **mes-adresses-api** so that the same API that serves `/v2` also serves depot under something like `/api-depot`. Then the frontend’s derived URL from `NEXT_PUBLIC_BAL_API_URL` can work without setting `NEXT_PUBLIC_BAN_API_DEPOT`.
+
+Until you do one of the above, depot calls will 404 and the app will continue to work thanks to the null/empty handling.
 
 ---
 
