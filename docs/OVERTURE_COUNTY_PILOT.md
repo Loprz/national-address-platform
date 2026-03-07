@@ -13,6 +13,22 @@ This pilot is a low-risk first step for modern geospatial ingestion:
 - Gives us a baseline address layer quickly.
 - Lets us validate quality and enrichment before scaling nationally.
 
+## National sizing reality
+
+Do not treat Overture as a single app file for the editor.
+
+- Public Overture release `2026-02-18.0` lists the global `theme=addresses/type=address` dataset at about `20.0 GB` compressed parquet across 19 files.
+- Using the current US planning figure of about `121.5M` US addresses out of `446M+` global addresses, the US-only slice is roughly `5.4 GB` compressed parquet.
+- JSON, CSV, or fully indexed database storage will be materially larger than the parquet source files.
+
+For this project, the operational default is:
+
+- keep Overture in parquet/object storage or staging
+- partition imports by state, county, or pilot boundary
+- import only the jurisdiction currently being tested into `mes-adresses-api`
+
+Do not attempt a full-US import into the primary editor database during the current pilot phase.
+
 ## Prerequisites
 
 - DuckDB CLI installed (`brew install duckdb`)

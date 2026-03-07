@@ -118,6 +118,8 @@ Every address, street, and place name in the platform can carry a GERS ID, store
 
 - [PROJECT_RESEARCH_AND_PLAN.md](PROJECT_RESEARCH_AND_PLAN.md) — Full research, architecture, and implementation roadmap
 - [LAB_SPEC_v1.0.md](LAB_SPEC_v1.0.md) — Local Address Base format specification (US equivalent of France's BAL)
+- [docs/EMAIL_SETUP_HOSTINGER_RESEND.md](docs/EMAIL_SETUP_HOSTINGER_RESEND.md) — Production email setup for Hostinger DNS + Resend + Railway
+- [docs/OVERTURE_COUNTY_PILOT.md](docs/OVERTURE_COUNTY_PILOT.md) — County-scoped Overture import workflow and national size guidance
 
 ## Roadmap
 

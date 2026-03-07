@@ -6,12 +6,12 @@ Deploy the US National Address Platform (frontend + API + Postgres + Redis) on [
 
 You will create **one Railway project** with **four services**:
 
-| Service    | Source              | Purpose                    |
-|-----------|---------------------|----------------------------|
-| **Postgres** | Railway plugin      | Database (PostGIS via extension) |
-| **Redis**    | Railway plugin      | Queues / cache for the API |
+| Service      | Source             | Purpose                                                                                                                                           |
+| ------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Postgres** | Railway plugin     | Database (PostGIS via extension)                                                                                                                  |
+| **Redis**    | Railway plugin     | Queues / cache for the API                                                                                                                        |
 | **API**      | `mes-adresses-api` | NestJS BAL API (commune search, bases-locales, etc.). **Depot** (`api-depot/`) is a separate app and is **not** in this setup; see §5a to add it. |
-| **Frontend** | `mes-adresses`     | Next.js editor             |
+| **Frontend** | `mes-adresses`     | Next.js editor                                                                                                                                    |
 
 The API and Frontend are deployed from their **own Git repos** (or from the same repo with two services and different root directories). Postgres and Redis are added from the Railway dashboard.
 
@@ -75,46 +75,58 @@ If you already created a **plain PostgreSQL** service, migrations will fail with
 
 ### API (`mes-adresses-api`)
 
-| Variable | Required | Example / notes |
-|----------|----------|------------------|
-| `POSTGRES_URL` | Yes | From Railway Postgres (e.g. `${{Postgres.DATABASE_URL}}`) |
-| `REDIS_URL` | Yes | From Railway Redis |
-| `PORT` | No | Set by Railway |
-| `API_URL` | Yes (prod) | Public API URL, e.g. `https://mes-adresses-api-xxx.up.railway.app` |
-| `EDITOR_URL_PATTERN` | Yes (prod) | `https://<frontend-domain>/bal/<id>/<token>` |
-| `SMTP_*` | No | Leave empty for dev (emails logged to console) |
-| `S3_*` | No | Only if you use generated files / exports |
-| `API_DEPOT_URL`, `BAN_API_URL`, etc. | No | Optional integrations; leave empty if not used |
+| Variable                             | Required             | Example / notes                                                                                   |
+| ------------------------------------ | -------------------- | ------------------------------------------------------------------------------------------------- |
+| `POSTGRES_URL`                       | Yes                  | From Railway Postgres (e.g. `${{Postgres.DATABASE_URL}}`)                                         |
+| `REDIS_URL`                          | Yes                  | From Railway Redis                                                                                |
+| `PORT`                               | No                   | Set by Railway                                                                                    |
+| `API_URL`                            | Yes (prod)           | Public API URL, e.g. `https://mes-adresses-api-xxx.up.railway.app`                                |
+| `EDITOR_URL_PATTERN`                 | Yes (prod)           | `https://<frontend-domain>/bal/<id>/<token>`                                                      |
+| `SMTP_*`                             | No                   | Optional. Use only if your Railway plan/network allows SMTP egress.                               |
+| `RESEND_API_KEY`, `RESEND_FROM`      | Recommended for prod | Preferred Railway setup for transactional email when SMTP is unavailable; uses Resend over HTTPS. |
+| `S3_*`                               | No                   | Only if you use generated files / exports                                                         |
+| `API_DEPOT_URL`, `BAN_API_URL`, etc. | No                   | Optional integrations; leave empty if not used                                                    |
 
 See [mes-adresses-api/.env.sample](../mes-adresses-api/.env.sample) for the full list.
 
+**Railway email delivery**
+
+For the US port on Railway, prefer the Resend HTTPS path:
+
+1. Leave `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `SMTP_SECURE` empty unless you have confirmed SMTP egress works for that service.
+2. Set `RESEND_API_KEY` to a live Resend API key.
+3. Set `RESEND_FROM` to a verified sender/domain in Resend.
+4. Optionally set `SMTP_BCC` for audit copies.
+
+With this setup, BAL creation, collaborator invite, recovery, token renewal, publication, and authorization PIN emails all use the same Resend-backed delivery path. If neither SMTP nor Resend is configured, production requests that require email now fail clearly with `503` instead of pretending delivery succeeded.
+
 ### Frontend (`mes-adresses`)
 
-| Variable | Required | Example / notes |
-|----------|----------|------------------|
-| `NEXT_PUBLIC_EDITEUR_URL` | Yes | Public frontend URL |
-| `NEXT_PUBLIC_BAL_API_URL` | Yes | API URL + `/v2` |
-| `PORT` | No | Set by Railway (Next.js uses it) |
-| `NEXT_PUBLIC_MAP_TILES_URL` | No | Default Stadia style if unset |
-| `NEXT_PUBLIC_MAP_GLYPHS_URL` | No | Default Stadia glyphs if unset |
-| `NEXT_PUBLIC_ORTHO_TILES_URL` | No | Optional aerial imagery |
-| `NEXT_PUBLIC_PARCEL_TILES_URL` | No | Optional parcel layer |
-| `HOME_DRAWER_NEWS_URL` | No | **US demo:** absolute URL returning JSON array of `{ id, message, date }`. When set, replaces Mattermost news. Example: `https://your-app.railway.app/demo/home-drawer-news.json` |
-| `HOME_DRAWER_EVENTS_URL` | No | **US demo:** absolute URL returning JSON array of events (same shape as [EventType](../mes-adresses/src/lib/bal-admin/type.ts)). When set, replaces bal-admin trainings. Example: `https://your-app.railway.app/demo/home-drawer-events.json` |
-| `NEXT_PUBLIC_BAN_API_DEPOT` | No | **Depot only:** base URL of the depot service (e.g. `https://api-depot-xxx.up.railway.app`). If unset, the frontend derives a URL from `NEXT_PUBLIC_BAL_API_URL` + `/api-depot`, which only works when depot is served at that path (see **Depot** below). |
+| Variable                       | Required | Example / notes                                                                                                                                                                                                                                            |
+| ------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_EDITEUR_URL`      | Yes      | Public frontend URL                                                                                                                                                                                                                                        |
+| `NEXT_PUBLIC_BAL_API_URL`      | Yes      | API URL + `/v2`                                                                                                                                                                                                                                            |
+| `PORT`                         | No       | Set by Railway (Next.js uses it)                                                                                                                                                                                                                           |
+| `NEXT_PUBLIC_MAP_TILES_URL`    | No       | Default Stadia style if unset                                                                                                                                                                                                                              |
+| `NEXT_PUBLIC_MAP_GLYPHS_URL`   | No       | Default Stadia glyphs if unset                                                                                                                                                                                                                             |
+| `NEXT_PUBLIC_ORTHO_TILES_URL`  | No       | Optional aerial imagery                                                                                                                                                                                                                                    |
+| `NEXT_PUBLIC_PARCEL_TILES_URL` | No       | Optional parcel layer                                                                                                                                                                                                                                      |
+| `HOME_DRAWER_NEWS_URL`         | No       | **US demo:** absolute URL returning JSON array of `{ id, message, date }`. When set, replaces Mattermost news. Example: `https://your-app.railway.app/demo/home-drawer-news.json`                                                                          |
+| `HOME_DRAWER_EVENTS_URL`       | No       | **US demo:** absolute URL returning JSON array of events (same shape as [EventType](../mes-adresses/src/lib/bal-admin/type.ts)). When set, replaces bal-admin trainings. Example: `https://your-app.railway.app/demo/home-drawer-events.json`              |
+| `NEXT_PUBLIC_BAN_API_DEPOT`    | No       | **Depot only:** base URL of the depot service (e.g. `https://api-depot-xxx.up.railway.app`). If unset, the frontend derives a URL from `NEXT_PUBLIC_BAL_API_URL` + `/api-depot`, which only works when depot is served at that path (see **Depot** below). |
 
 See [mes-adresses/.env.sample](../mes-adresses/.env.sample) for the full list.
 
 **Home drawer – US demo (NAD / Census / Overture)**  
 To show news and events from American sources instead of the default French Mattermost and bal-admin:
 
-1. Set **`HOME_DRAWER_NEWS_URL`** to a URL that returns a JSON array of `{ id, message, date }` (or `{ news: [...] }`).  
-2. Set **`HOME_DRAWER_EVENTS_URL`** to a URL that returns a JSON array of events with at least `id`, `type`, `date`, `startHour`, `endHour`, `description` (and optionally `href` for the registration link).  
+1. Set **`HOME_DRAWER_NEWS_URL`** to a URL that returns a JSON array of `{ id, message, date }` (or `{ news: [...] }`).
+2. Set **`HOME_DRAWER_EVENTS_URL`** to a URL that returns a JSON array of events with at least `id`, `type`, `date`, `startHour`, `endHour`, `description` (and optionally `href` for the registration link).
 
 The repo includes static demo payloads you can serve from the same app:
 
-- **News:** set `HOME_DRAWER_NEWS_URL` = `https://<your-frontend-domain>/demo/home-drawer-news.json`  
-- **Events:** set `HOME_DRAWER_EVENTS_URL` = `https://<your-frontend-domain>/demo/home-drawer-events.json`  
+- **News:** set `HOME_DRAWER_NEWS_URL` = `https://<your-frontend-domain>/demo/home-drawer-news.json`
+- **Events:** set `HOME_DRAWER_EVENTS_URL` = `https://<your-frontend-domain>/demo/home-drawer-events.json`
 
 Those files under `mes-adresses/public/demo/` contain placeholder content for **NAD**, **Census Bureau**, and **Overture Maps**. You can replace them or point the env vars at your own JSON endpoints (e.g. a small proxy to Census or Overture announcements).
 
@@ -136,11 +148,42 @@ To **actually use** the depot for the US deployment, choose one of these:
 
 **Option 1 – Deploy api-depot as a fifth service**
 
-1. In the same Railway project, **+ New** → **GitHub Repo** → select the repo and set the **root directory** (or monorepo path) to **`api-depot`**.
-2. Configure build/start for the NestJS app (e.g. port 4242 or whatever `api-depot` uses; set `PORT` if needed).
-3. Generate a **public domain** for the api-depot service (e.g. `https://api-depot-xxx.up.railway.app`).
-4. In the **Frontend** service variables, set **`NEXT_PUBLIC_BAN_API_DEPOT`** = that URL (no `/api-depot` path; api-depot’s routes are at the root: `/communes/...`).
-5. Redeploy the frontend.
+You can deploy from either the **standalone repo** `Loprz/api-depot` or from **this repo** (e.g. `Loprz/national-address-platform`) with root directory set to `api-depot`.
+
+1. **Add the service**
+   In the same Railway project, click **+ New** → **GitHub Repo** → select:
+
+   - **From standalone repo:** `Loprz/api-depot` (no root directory).
+   - **From this monorepo:** your `national-address-platform` repo, then in the new service go to **Settings** → **Source** and set **Root Directory** to `api-depot`.
+
+2. **Build & start**
+
+   - The `api-depot` app uses `yarn build` (NestJS → `dist/`) and `node dist/main`; it listens on `process.env.PORT` (default 4242). Railway sets `PORT` automatically.
+   - If you use the monorepo with root `api-depot`, the repo’s `api-depot/railway.toml` sets the start command. If you use the standalone `Loprz/api-depot` repo, add in **Settings** → **Deploy**: **Start Command** = `node dist/main`, and ensure the **Build Command** runs `yarn install` and `yarn build` (or leave empty and rely on Nixpacks detecting the Node app).
+
+3. **Variables**
+   In the api-depot service → **Variables**, set at least:
+
+   - **`POSTGRES_URL`** – Postgres connection string. You can use the same Postgres service as the BAL API (e.g. `${{Postgres.DATABASE_URL}}`) with a **separate database** (e.g. create a DB named `api_depot` and use a URL pointing to it), or add a second Postgres/PostGIS service for the depot.
+   - **`SESSION_SECRET`** – Any long random string (e.g. `openssl rand -hex 32`).
+   - **`PORT`** – Usually set by Railway; omit unless you need to override.
+     Optional: **`API_DEPOT_URL`** = the depot’s public URL (for Swagger); set this after you generate the domain.
+
+4. **Create depot database (one-time)**
+   The depot needs its own database (e.g. `api_depot`) on the same Postgres server. From your machine, using the **public** Postgres URL (from Postgres → Variables or Connect → Public Network in Railway):
+   `cd api-depot && DATABASE_URL='<public-postgres-url>' node scripts/create-api-depot-db.mjs`
+   The script creates a database named **api_depot** (underscore). Then set the api-depot service’s **POSTGRES_URL** to that same URL with the path changed to `/api_depot` (e.g. `.../railway` → `.../api_depot`).
+
+5. **Migrations (one-time)**
+   From your machine, with the Postgres URL that points at the `api_depot` database:
+   `cd api-depot && POSTGRES_URL='...' yarn typeorm:migration:run`
+   (Or use Railway CLI from the api-depot service: `railway run yarn typeorm:migration:run`.)
+
+6. **Public domain**
+   In the api-depot service → **Settings** → **Networking** → **Generate Domain**. Note the URL (e.g. `https://api-depot-xxx.up.railway.app`). Set **`API_DEPOT_URL`** in the api-depot service to this URL if you use Swagger.
+
+7. **Wire the frontend**
+   In the **Frontend** (mes-adresses) service → **Variables**, set **`NEXT_PUBLIC_BAN_API_DEPOT`** = the depot’s public URL (no path; api-depot’s routes are at the root, e.g. `https://api-depot-xxx.up.railway.app`). Redeploy the frontend.
 
 **Option 2 – Add depot behind the same API**
 
@@ -156,22 +199,22 @@ Use this to verify everything is set correctly (no automated check — run throu
 
 **API (`mes-adresses-api`)**
 
-| Check | What to verify |
-|-------|----------------|
-| **POSTGRES_URL** | Points to your **PostGIS** (or Postgres-with-PostGIS) database. Same host/URL as the service where you ran migrations (e.g. `shortline.proxy.rlwy.net` for PostGIS). Not the old plain Postgres if you have both. |
-| **REDIS_URL** | Set and uses the **private** Redis URL (e.g. `${{Redis.REDIS_URL}}` or `${{Redis.REDIS_PRIVATE_URL}}`). Avoid using the public Redis URL from outside Railway to prevent ETIMEDOUT and egress. |
-| **API_URL** | Your API’s **public** URL (e.g. `https://mes-adresses-api-production.up.railway.app`). |
-| **EDITOR_URL_PATTERN** | `https://<your-frontend-domain>/bal/<id>/<token>` with your real frontend domain. |
-| **Start command** | `node dist/apps/api/main.js` (no `railway run` or migration command). |
-| **Deploy status** | Latest deployment **Success**; Deploy Logs show “Nest application successfully started” and no Redis ETIMEDOUT. |
+| Check                  | What to verify                                                                                                                                                                                                    |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **POSTGRES_URL**       | Points to your **PostGIS** (or Postgres-with-PostGIS) database. Same host/URL as the service where you ran migrations (e.g. `shortline.proxy.rlwy.net` for PostGIS). Not the old plain Postgres if you have both. |
+| **REDIS_URL**          | Set and uses the **private** Redis URL (e.g. `${{Redis.REDIS_URL}}` or `${{Redis.REDIS_PRIVATE_URL}}`). Avoid using the public Redis URL from outside Railway to prevent ETIMEDOUT and egress.                    |
+| **API_URL**            | Your API’s **public** URL (e.g. `https://mes-adresses-api-production.up.railway.app`).                                                                                                                            |
+| **EDITOR_URL_PATTERN** | `https://<your-frontend-domain>/bal/<id>/<token>` with your real frontend domain.                                                                                                                                 |
+| **Start command**      | `node dist/apps/api/main.js` (no `railway run` or migration command).                                                                                                                                             |
+| **Deploy status**      | Latest deployment **Success**; Deploy Logs show “Nest application successfully started” and no Redis ETIMEDOUT.                                                                                                   |
 
 **Frontend (`mes-adresses`)**
 
-| Check | What to verify |
-|-------|----------------|
-| **NEXT_PUBLIC_BAL_API_URL** | API public URL + `/v2` (e.g. `https://mes-adresses-api-production.up.railway.app/v2`). |
+| Check                       | What to verify                                                                          |
+| --------------------------- | --------------------------------------------------------------------------------------- |
+| **NEXT_PUBLIC_BAL_API_URL** | API public URL + `/v2` (e.g. `https://mes-adresses-api-production.up.railway.app/v2`).  |
 | **NEXT_PUBLIC_EDITEUR_URL** | Your frontend’s **public** URL (e.g. `https://mes-adresses-production.up.railway.app`). |
-| **Deploy status** | Latest deployment **Success**. |
+| **Deploy status**           | Latest deployment **Success**.                                                          |
 
 **Smoke test**
 
@@ -227,6 +270,7 @@ You can automate part of the setup with the [Railway GraphQL API](https://docs.r
    ```
 
    The script will:
+
    - Create a new project (or use `RAILWAY_PROJECT_ID` if set).
    - Create **API** and **Frontend** services from your GitHub repos.
    - Generate public domains for both.
