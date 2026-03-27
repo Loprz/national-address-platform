@@ -97,6 +97,7 @@ For the US port on Railway, prefer the Resend HTTPS path:
 2. Set `RESEND_API_KEY` to a live Resend API key.
 3. Set `RESEND_FROM` to a verified sender/domain in Resend.
 4. Optionally set `SMTP_BCC` for audit copies.
+5. Optional from the repo root: run `DRY_RUN=1 RESEND_API_KEY=... RESEND_FROM=... SMTP_BCC=... node scripts/railway-configure-email.mjs`, then rerun without `DRY_RUN` once the target service looks correct.
 
 With this setup, BAL creation, collaborator invite, recovery, token renewal, publication, and authorization PIN emails all use the same Resend-backed delivery path. If neither SMTP nor Resend is configured, production requests that require email now fail clearly with `503` instead of pretending delivery succeeded.
 
@@ -220,6 +221,90 @@ Use this to verify everything is set correctly (no automated check — run throu
 
 1. Open the **API** URL in a browser (e.g. `https://<api-domain>/` or `/v2`). You should get a response (e.g. 404 or JSON), not 502.
 2. Open the **frontend** URL. The app should load; try opening or creating a BAL so the frontend talks to the API.
+
+---
+
+## 5c. Phase 1 US launch profile
+
+Use this section as the shortest source of truth for the current US production launch.
+
+- Phase 1 scope is **authoring, certification, and publication**.
+- Public reports and report processing are **out of scope** for Phase 1.
+- The production stack assumes **five Railway services**: PostGIS, Redis, `mes-adresses-api`, `mes-adresses`, and `api-depot`.
+
+### Frontend (`mes-adresses`)
+
+Launch-critical variables:
+
+- `NEXT_PUBLIC_EDITEUR_URL`
+- `NEXT_PUBLIC_BAL_API_URL`
+- `NEXT_PUBLIC_BAN_API_DEPOT`
+- `NEXT_PUBLIC_REPORTS_ENABLED=false`
+
+Launch assumptions:
+
+- Build from the **US port branch** so the English UI and US wording are present.
+- `NEXT_PUBLIC_API_SIGNALEMENT` may remain set, but reports stay hidden while `NEXT_PUBLIC_REPORTS_ENABLED=false`.
+- Map/parcel/ortho/news/event variables are optional for Phase 1.
+
+### API (`mes-adresses-api`)
+
+Launch-critical variables:
+
+- `POSTGRES_URL`
+- `REDIS_URL`
+- `API_URL`
+- `EDITOR_URL_PATTERN`
+- `API_DEPOT_URL`
+- `API_DEPOT_CLIENT_SECRET`
+- `RESEND_API_KEY`
+- `RESEND_FROM`
+
+Recommended:
+
+- `SMTP_BCC` for audit copies
+
+Leave unset for the current Railway production path:
+
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASS`
+- `SMTP_SECURE`
+
+Phase 1 assumptions:
+
+- Transactional email is expected to go through **Resend HTTPS**, not SMTP.
+- `API_SIGNALEMENT_CLIENT_SECRET` is not required while reports remain out of scope.
+- Publication depends on the separate `api-depot` service being reachable at `API_DEPOT_URL`.
+
+### Depot (`api-depot`)
+
+Launch-critical variables:
+
+- `POSTGRES_URL`
+- `SESSION_SECRET`
+- `API_DEPOT_VALIDATION_PROFILE=us`
+
+Recommended:
+
+- `API_DEPOT_VALIDATION_US_DOWNGRADED_ERRORS=row.longlat_invalides`
+- `API_DEPOT_URL`
+
+Not launch-critical for Phase 1:
+
+- `BAN_API_TOKEN`
+- `PC_*`
+- `SMTP_*`
+
+### Rollout assumptions
+
+- Use safe disposable BALs for smoke tests unless you intentionally mean to replace a live published jurisdiction.
+- Verify publication with both app state and depot state:
+  - BAL status becomes `published` / sync `synced` in `mes-adresses-api`
+  - `GET /communes/:codeCommune/current-revision` in `api-depot` points to the same BAL ID
+- Prefer the Resend-backed PIN email flow for authorization checks.
+- If `NEXT_PUBLIC_BAN_API_DEPOT` is missing, the frontend falls back to `NEXT_PUBLIC_BAL_API_URL + /api-depot`, which does **not** match the current separate-service Railway deployment.
 
 ---
 

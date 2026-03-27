@@ -1,6 +1,6 @@
 # US Port Tracker
 
-Last updated: March 6, 2026
+Last updated: March 27, 2026
 
 ## Current Call
 
@@ -75,33 +75,18 @@ Last updated: March 6, 2026
   - publication notifications
   - authorization PIN delivery
   - all production email-required flows now fail clearly with `503` if neither SMTP nor Resend is configured
+- Replaced the legacy French publication-conflict image in `mes-adresses` with a US LAB/National Address Platform diagram and verified the updated modal live in production on March 13, 2026.
 
 ## Next
 
-- Run a full production smoke test for:
-  - BAL page
-  - streets
-  - place names
-  - address editing
-  - publication
-  - sync
-- Test one real end-to-end US import through `api-depot` with a safe pilot dataset.
-- Finish the remaining French-to-US terminology cleanup in admin/publication flows.
-- Document the Phase 1 production env vars and rollout assumptions.
-- Re-test production publication/sync against the deployed `api-depot` US validation fixes.
-- Run a fuller production publish/sync smoke test from `mes-adresses-api` using a safe BAL when we are ready to mutate production data.
-- Decide whether to add an explicit US-mode startup guard for `api-depot` local dev to avoid local S3 config friction.
-- Configure real `RESEND_API_KEY` and `RESEND_FROM` in Railway for `mes-adresses-api` and verify end-to-end delivery for both recovery and PIN flows to a Fresno County inbox.
+- Confirm external inbox receipt for the Resend-backed BAL creation email if we want the same human-level confirmation we now have for the Fresno County PIN flow.
 
 ## Blocked
 
 - Reports are not Phase 1 ready.
 - Reports depend on an external signalement service and a backend secret model.
 - `mes-adresses-api` likely still needs `API_SIGNALEMENT_CLIENT_SECRET` if reports are brought back into scope.
-- The full local `api-depot` HTTP publish path is still not signed off because local startup remains slow and requires placeholder S3 env values.
-- Production email delivery is still not configured for `mes-adresses-api`:
-  - `SMTP_HOST` is unset
-  - `RESEND_API_KEY`/`RESEND_FROM` still need to be populated in Railway
+- The full local `api-depot` HTTP publish path is still not fully signed off, but local US-mode no longer requires placeholder S3 env values to fall back to database file storage.
 - Railway service-level egress check from `mes-adresses-api` confirms `smtp.resend.com:465` and `:587` time out while HTTPS (`api.resend.com:443`) is reachable. This means Railway email delivery for the US port should use the Resend HTTP API path rather than SMTP unless the plan/network changes.
 
 ## Phase 1 Checklist
@@ -109,29 +94,29 @@ Last updated: March 6, 2026
 ### Scope
 
 - [x] Reports are hidden or clearly deferred in production
-- [ ] Phase 1 launch scope is documented as authoring, certification, publication
+- [x] Phase 1 launch scope is documented as authoring, certification, publication
 
 ### Frontend
 
 - [x] BAL page loads for a US jurisdiction
 - [x] Fowler map centers on the intended area
-- [ ] Streets workflow verified end-to-end
-- [ ] Place names workflow verified end-to-end
-- [ ] Address edit workflow verified end-to-end
-- [ ] Mobile/responsive check completed on core authoring screens
-- [ ] Remaining French admin/publication terms cleaned up
+- [x] Streets workflow verified end-to-end
+- [x] Place names workflow verified end-to-end
+- [x] Address edit workflow verified end-to-end
+- [x] Mobile/responsive check completed on core authoring screens
+- [x] Remaining French admin/publication terms cleaned up
 
 ### Auth
 
 - [x] Admin access recovery UI path tested in production
-- [ ] Authenticated admin edit flow tested in production
+- [x] Authenticated admin edit flow tested in production
 - [x] Read-only behavior confirmed for non-admin users
 
 ### Publication
 
 - [x] Draft BAL can be published in production
 - [x] Post-publication sync state updates correctly
-- [ ] Published BAL remains stable after reload
+- [x] Published BAL remains stable after reload
 
 ### API
 
@@ -140,7 +125,7 @@ Last updated: March 6, 2026
 - [x] Place names fetch works
 - [x] Jurisdiction contour fetch works
 - [x] Publication endpoints verified in production
-- [ ] Certification workflow verified in production
+- [x] Certification workflow verified in production
 
 ### Import and Validation
 
@@ -152,11 +137,11 @@ Last updated: March 6, 2026
 
 ### Ops
 
-- [ ] Railway deploy state confirmed for all three services
+- [x] Railway deploy state confirmed for all three services
 - [x] `api-depot` Railway deploy state confirmed after US validation fix
 - [x] `api-depot` health/readiness checks confirmed during release pass
-- [ ] No repeated production 500s during smoke test
-- [ ] Public domains stable during release pass
+- [x] No repeated production 500s during smoke test
+- [x] Public domains stable during release pass
 
 ## Phase 2
 
@@ -173,6 +158,113 @@ Last updated: March 6, 2026
 - Only treat Phase 1 as release-ready when all launch-critical checkboxes are complete.
 
 ## Session Notes
+
+### March 27, 2026
+
+- Added an explicit local US-mode startup guard in `api-depot` file storage:
+  - when `API_DEPOT_VALIDATION_PROFILE=us`
+  - and `NODE_ENV` is not `production`
+  - and required `S3_*` env vars are missing
+  - `api-depot` now skips S3 client usage for new BAL file uploads and relies on the existing database fallback path instead of requiring dummy S3 config
+- Updated the local developer guidance:
+  - `api-depot/.env.sample` now says local US-mode can leave `S3_*` empty
+  - `api-depot/README.md` now documents the DB fallback behavior for local US-mode
+- Added a repo-level `.nvmrc` pinning Node `22` for the whole workspace
+- Added focused file-storage tests in `api-depot` for:
+  - the local US-mode S3 guard path
+  - the database fallback path in `FileService`
+- Verification caveat on this machine:
+  - Node `22` is now available locally and `.nvmrc` pins the workspace accordingly
+  - in this Codex shell, commands still need `source ~/.nvm/nvm.sh && nvm use 22` before running Node-based tooling
+  - local `jest` / `nest build` / `tsc` did not complete cleanly in this environment even after switching to Node `22`, so a clean automated local pass is still pending here
+
+### March 21, 2026
+
+- Confirmed current production Railway deploy state for all three services:
+  - `mes-adresses` latest deploy `5466f56e-3e67-41f6-b13f-957dbdf9aa95` -> `SUCCESS`
+  - `mes-adresses-api` latest deploy `418d2128-9dc9-4894-bfe3-667d90a1648d` -> `SUCCESS`
+  - `api-depot` latest deploy `04261ecd-04c1-47fb-9567-95f3b8b3faae` -> `SUCCESS`
+- Confirmed public roots stayed healthy during the release pass:
+  - `https://mes-adresses-production.up.railway.app` -> `200`
+  - `https://mes-adresses-api-production.up.railway.app` -> `200`
+  - `https://api-depot-production.up.railway.app` -> `200`
+- Verified authenticated admin edit flow on disposable Fresno County BAL `69b44613edb7d645fb92f91e` using the saved admin token URL:
+  - reopened address `100 a`
+  - saved an edit successfully and received `The number has been updated`
+  - reopened the same address and confirmed the edited state was still present in the admin UI
+- Verified certification workflow in production on the same disposable BAL:
+  - used `Certify and save` on number `100 a`
+  - received `The number has been updated`
+  - the uncertified-address filter no longer returned any rows for `Smoke Test Avenue`
+  - direct API check now returns `certifie: true` for numero `69b446a6edb7d645fb92f920`
+- Verified published BAL stability after reload on published Fresno County BAL `69a63d42f7640a532120ab9f`:
+  - initial public load succeeded in read-only mode
+  - full reload succeeded
+  - counts remained stable at `5 streets`, `0 place name`, `80 addresses`
+- Completed a mobile-width smoke check at `390x844` on the disposable draft BAL:
+  - jurisdiction screen loaded
+  - streets list loaded
+  - address list for `Smoke Test Avenue` loaded
+  - place names list loaded
+- During this March 21 release pass, no `500` responses were observed from the frontend, API, or `api-depot` public endpoints and no application API requests returned `500` in the browser network log.
+- Residual non-blocking issues still observed during the browser pass:
+  - repeated minified frontend console errors from `/_next/static/chunks/d718153449c72f1e.js`
+  - repeated `400` responses from `api.panoramax.xyz` vector-tile requests
+  - expected `204` responses for empty tile requests
+  - `comment` remains filtered from unauthenticated public numero API responses, so public API checks do not expose the confidential note saved in the admin UI
+- Documented the Phase 1 launch scope explicitly in `README.md`:
+  - Phase 1 production scope is US authoring, certification, and publication
+  - public reports and report processing remain out of scope
+- Finished the remaining French-to-US admin/publication wording cleanup in `mes-adresses` and deployed it to production:
+  - updated certification help copy and guide links
+  - updated publication help/tutorial buttons and conflict wording
+  - updated ProConnect wording in the authorization strategy selector
+  - updated welcome/onboarding publication copy and `jurisdiction logo` alt text
+  - frontend deploys `75d4ff7d-e626-46d6-8e92-4be2d80f6294` and `acc468c3-ddb1-4138-bf24-46c9556f7301` reached `SUCCESS`
+- Re-verified the live frontend after the wording deploys on disposable Fresno County BAL `69b44613edb7d645fb92f91e`:
+  - welcome modal now says `Start by publishing`
+  - publish conflict flow shows `Publish` and `Force publication`
+  - the BAL used for verification was already in the accepted-authorization state, so live verification re-entered the conflict modal directly rather than the earlier ProConnect choice screen
+- Re-confirmed that the earlier Fresno County import already satisfies the real end-to-end US import-through-`api-depot` proof without another production mutation:
+  - `GET /v2/overture/stats/69a63d42f7640a532120ab9f` -> `{"totalAddresses":80,"withGersId":80,"withoutGersId":0,"coveragePercent":100}`
+  - `GET /communes/06019/current-revision` -> current revision `69a8eafbbdb0f78f0a7ad66c`
+  - `context.extras.balId` on that revision still matches imported Fresno County BAL `69a63d42f7640a532120ab9f`
+- Documented the Phase 1 production env vars and rollout assumptions in `docs/RAILWAY_DEPLOYMENT.md` and aligned the repo env samples:
+  - added a focused `Phase 1 US launch profile` section with launch-critical vars and rollout assumptions for frontend, API, and `api-depot`
+  - added `NEXT_PUBLIC_REPORTS_ENABLED=false` guidance to `mes-adresses/.env.sample`
+  - clarified `API_DEPOT_URL` / `API_DEPOT_CLIENT_SECRET` and reports-out-of-scope signalement expectations in `mes-adresses-api/.env.sample`
+  - changed `api-depot/.env.sample` to use `API_DEPOT_VALIDATION_PROFILE=us`
+
+### March 13, 2026
+
+- Added `scripts/railway-configure-email.mjs` to upsert `RESEND_API_KEY`, `RESEND_FROM`, and optional `SMTP_BCC` on the linked `mes-adresses-api` Railway service and optionally trigger a deploy.
+- Documented the helper script and a safe `DRY_RUN=1` path in the Railway/email setup docs so the remaining production email rollout step is one command after Railway re-authentication.
+- Re-authenticated Railway locally, set production `RESEND_API_KEY`, `RESEND_FROM`, and `SMTP_BCC` on `mes-adresses-api`, and confirmed the resulting Railway deploy completed successfully.
+- Confirmed the public API remained healthy after the deploy (`GET /` -> `200`).
+- Production smoke test reached Resend successfully, but live BAL creation still failed because Resend returned `403` for the unverified `ryanlopez.tech` sender domain.
+- Removed the live `RESEND_API_KEY` again and redeployed `mes-adresses-api` so production reverted to the clearer fallback behavior (`POST /v2/bases-locales` now returns `503 Email delivery is not configured`) while domain verification is pending.
+- Re-enabled the live `RESEND_API_KEY` after `ryanlopez.tech` was verified in Resend, waited for Railway deploy `418d2128-9dc9-4894-bfe3-667d90a1648d` to reach `SUCCESS`, and confirmed the public API stayed healthy.
+- Completed a fresh production smoke test with Resend enabled:
+  - created BAL `69b44543edb7d645fb92f91c` for Fresno County (`06019`) with `POST /v2/bases-locales` -> `200`
+  - created authorization `69b44543edb7d645fb92f91d` with `POST /v2/bases-locales/:id/habilitation` -> `201`
+  - sent a real PIN email to `rylopez@fresnocountyca.gov` with `POST /v2/bases-locales/:id/habilitation/email/send-pin-code` -> `200`
+  - Railway runtime logs report `PIN code sent` with no Resend error after the successful deploy
+- Confirmed human inbox receipt of the Fresno County verification email, including the expected `noreply@ryanlopez.tech` sender and a valid six-digit code, so the production PIN email path is now verified end-to-end.
+- Ran a live production frontend smoke test on disposable Fresno County BAL `69b44613edb7d645fb92f91e`:
+  - BAL page loaded successfully in the editor
+  - created street `Smoke Test Avenue`
+  - created address `100` and then updated it to `100 a`
+  - created place name `Smoke Landmark`
+  - reached the production publication conflict modal and confirmed the live app correctly warns that force publication would replace the currently published Fresno County BAL `69a63d42f7640a532120ab9f`
+- Did not complete force-publication from the UI because the disposable smoke-test BAL contains new test data and would overwrite the real published Fresno County dataset if forced.
+- The replace-publication dialog still contains a French legacy conflict diagram image; replaced that static image in the frontend source with a US-port React diagram using LAB/National Address Platform terminology.
+- Deployed the `mes-adresses` frontend with the new US conflict diagram and verified it live in production on BAL `69b44613edb7d645fb92f91e`; the publish modal now shows:
+  - `Current situation`
+  - `After force publication`
+  - `New LAB`
+  - `Current LAB`
+  - `National Address Platform`
+- Did not click `Force publication` during that verification pass, so the real published Fresno County BAL `69a63d42f7640a532120ab9f` remains untouched.
 
 ### March 6, 2026
 

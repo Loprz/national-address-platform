@@ -175,7 +175,8 @@ YYYYMMDD_lab_{FIPS}_{sourcename}.csv
 Examples:
 - `20260207_lab_20045_douglascountyks.csv`
 - `20260207_lab_48201_harriscountytx.csv`
-- `20260207_lab_06037_lacountygis.csv`
+- `20260207_lab_06019_fresnocountygis.csv`
+- `20260207_lab_06107_tularecountygis.csv`
 
 Rules:
 - Date: creation date of the dataset

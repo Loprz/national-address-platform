@@ -76,6 +76,26 @@ The API now sends all transactional mail through the same transport selection lo
 - otherwise Resend HTTPS if `RESEND_API_KEY` is set
 - otherwise `503` in production for email-required flows
 
+Optional helper from the repo root:
+
+```bash
+# Preview the target service and variables without changing Railway
+DRY_RUN=1 \
+RESEND_API_KEY=your_live_resend_key \
+RESEND_FROM=noreply@ryanlopez.tech \
+SMTP_BCC=ryan@ryanlopez.tech \
+node scripts/railway-configure-email.mjs
+
+# Apply the variables and trigger a deploy
+RAILWAY_TOKEN=your_railway_token \
+RESEND_API_KEY=your_live_resend_key \
+RESEND_FROM=noreply@ryanlopez.tech \
+SMTP_BCC=ryan@ryanlopez.tech \
+node scripts/railway-configure-email.mjs
+```
+
+The helper script targets the linked `mes-adresses-api` Railway service by default. If your local Railway session is stale, run `railway login` first or pass a fresh `RAILWAY_TOKEN`.
+
 ## 5. Smoke test
 
 After the domain is verified and Railway variables are set:

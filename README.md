@@ -51,8 +51,17 @@ yarn dev                      # Starts on http://localhost:3000
 # 4. Test it works
 curl -X POST http://localhost:5050/v2/bases-locales/create-demo \
   -H "Content-Type: application/json" \
-  -d '{"commune": "06037"}'
-# Returns: { "nom": "Addresses of Los Angeles County, CA [demo]", ... }
+  -d '{"commune": "06019"}'
+# Returns: { "nom": "Addresses of Fresno County, CA [demo]", ... }
+
+# Optional: Create a second demo for Tulare County
+curl -X POST http://localhost:5050/v2/bases-locales/create-demo \
+  -H "Content-Type: application/json" \
+  -d '{"commune": "06107"}'
+# Returns: { "nom": "Addresses of Tulare County, CA [demo]", ... }
+
+# Note: in this quick-start flow, `commune` uses county FIPS (state+county, 5 digits),
+# so each demo covers the full county jurisdiction (including cities within it).
 ```
 
 **Prerequisites**: Docker, Node.js 22+, Yarn
@@ -123,9 +132,12 @@ Every address, street, and place name in the platform can carry a GERS ID, store
 
 ## Roadmap
 
+Current Phase 1 production scope is **US authoring, certification, and publication**.
+Public reports and report processing remain out of scope for Phase 1.
+
 | Phase | Timeline | Goal |
 |-------|----------|------|
-| **Phase 1: 1:1 Port** | Months 1-4 | French system running with US data |
+| **Phase 1: 1:1 Port** | Months 1-4 | US authoring, certification, and publication live in production |
 | **Phase 2: US Adaptation** | Months 5-8 | Spanish language, US jurisdictions, Overture import, pilot |
 | **Phase 3: Schema Expansion** | Months 9-14 | Auto-generate NAD/NENA/FGDC exports from minimal input |
 | **Phase 4: National Launch** | Months 15-20 | Full national rollout |
