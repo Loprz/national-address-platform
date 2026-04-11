@@ -1,6 +1,6 @@
 # US Port Tracker
 
-Last updated: April 4, 2026
+Last updated: April 11, 2026
 
 ## Current Call
 
@@ -10,7 +10,7 @@ Last updated: April 4, 2026
 
 ## Current Heads
 
-- `mes-adresses`: `us-port` at `03d5d914`
+- `mes-adresses`: `us-port` at `b53f8f02`
 - `mes-adresses-api`: `us-port` at `f56f934`
 - `api-depot`: `us-port` at `7538240`
 
@@ -79,6 +79,10 @@ Last updated: April 4, 2026
 - Exact local browser verification of the updated `/new` and BAL recovery flows is now complete.
 - The shared jurisdiction selector now supports `/new` deep-link prefill via `state`, `county`, and `place`, preserves selection on revisit/back-navigation, and shows clearer county-wide vs city/township summaries in both create and recovery flows.
 - Recovery launched from the existing-draft warning in `/new` now carries the already selected jurisdiction into the recovery modal instead of forcing the user to reselect it.
+- The force-publication conflict diagram now uses cleaner connector geometry and a clearer replacement marker in the publish flow.
+- The "already published LAB" guidance now more clearly explains when to continue with the published LAB versus replacing it.
+- BAL help/tutorial copy now matches the structured `state -> county -> city/place` selector and the county-wide path in the US port.
+- The replaced-sync status message now uses the US support address and clearer takeover guidance.
 
 ## Next
 
@@ -161,6 +165,22 @@ Last updated: April 4, 2026
 - Only treat Phase 1 as release-ready when all launch-critical checkboxes are complete.
 
 ## Session Notes
+
+### April 11, 2026
+
+- Refined the force-publication conflict modal in `mes-adresses`:
+  - adjusted the replacement diagram so the active green path lands cleanly on the National Address Platform
+  - replaced the floating red `x` with a more deliberate replacement marker on the superseded LAB path
+- Clarified the alternative-to-replacement messaging for already published LABs:
+  - `mes-adresses`-managed published LABs now explicitly recommend continuing from the published LAB when appropriate
+  - API Depot and harvested-source warnings now explain replacement/contact tradeoffs in more direct US wording
+- Updated the BAL help/tutorial layer to match the structured selector:
+  - create/import help now instructs users to choose state, county, and city/township or county-wide scope
+  - the "I can't find my jurisdiction" help now mentions the county-wide option for unincorporated areas
+  - the recovery helper CTA now reads more clearly as an access-recovery action
+- Updated the live replaced-sync banner copy:
+  - conflict guidance now refers to the published LAB for the jurisdiction
+  - support contact now points to `support@nap.us.gov`
 
 ### April 4, 2026
 
