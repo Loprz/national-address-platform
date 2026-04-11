@@ -10,7 +10,7 @@ Last updated: April 11, 2026
 
 ## Current Heads
 
-- `mes-adresses`: `us-port` at `b53f8f02`
+- `mes-adresses`: `us-port` at `d39c7ba5`
 - `mes-adresses-api`: `us-port` at `f56f934`
 - `api-depot`: `us-port` at `7538240`
 
@@ -83,6 +83,7 @@ Last updated: April 11, 2026
 - The "already published LAB" guidance now more clearly explains when to continue with the published LAB versus replacing it.
 - BAL help/tutorial copy now matches the structured `state -> county -> city/place` selector and the county-wide path in the US port.
 - The replaced-sync status message now uses the US support address and clearer takeover guidance.
+- Publication help and the BAL publication goal now use the same US conflict/takeover guidance as the rest of the publish flow.
 
 ## Next
 
@@ -181,6 +182,9 @@ Last updated: April 11, 2026
 - Updated the live replaced-sync banner copy:
   - conflict guidance now refers to the published LAB for the jurisdiction
   - support contact now points to `support@nap.us.gov`
+- Aligned remaining publication-conflict wording with the same US guidance:
+  - the BAL publication goal now explains that a different LAB is currently published for the jurisdiction
+  - the publication help tab now explains when to continue from the current published LAB versus using Force publication to take over
 
 ### April 4, 2026
 
