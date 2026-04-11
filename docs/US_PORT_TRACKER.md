@@ -1,6 +1,6 @@
 # US Port Tracker
 
-Last updated: March 27, 2026
+Last updated: April 4, 2026
 
 ## Current Call
 
@@ -76,6 +76,9 @@ Last updated: March 27, 2026
   - authorization PIN delivery
   - all production email-required flows now fail clearly with `503` if neither SMTP nor Resend is configured
 - Replaced the legacy French publication-conflict image in `mes-adresses` with a US LAB/National Address Platform diagram and verified the updated modal live in production on March 13, 2026.
+- Exact local browser verification of the updated `/new` and BAL recovery flows is now complete.
+- The shared jurisdiction selector now supports `/new` deep-link prefill via `state`, `county`, and `place`, preserves selection on revisit/back-navigation, and shows clearer county-wide vs city/township summaries in both create and recovery flows.
+- Recovery launched from the existing-draft warning in `/new` now carries the already selected jurisdiction into the recovery modal instead of forcing the user to reselect it.
 
 ## Next
 
@@ -159,6 +162,59 @@ Last updated: March 27, 2026
 
 ## Session Notes
 
+### April 4, 2026
+
+- Fixed the local `mes-adresses` dev-server startup bottleneck enough to complete the previously blocked browser pass:
+  - `mes-adresses/next.config.ts` now keeps `reactCompiler` enabled in production but disables it in local dev
+  - `mes-adresses/next.config.ts` now enables `experimental.optimizePackageImports` for `evergreen-ui`
+  - cold local startup improved from a multi-minute stall to `Ready in 8.6s`
+- Reduced the `/new` route compile path so the structured selector is locally usable:
+  - `mes-adresses/src/components/new/index.tsx` now lazy-loads the step components with `next/dynamic`
+  - this removed step 2's CSV validator bundle from the initial `/new` critical path
+  - local `/new` responses dropped to sub-second range after the route warmed
+- Completed an exact local browser pass using headless Chrome DevTools Protocol after the Playwright MCP path hit a root-filesystem cache-dir issue in this Codex environment:
+  - `/new` renders the new `state -> county -> city/place` selector with the expected labels
+  - selecting California loads county options locally
+  - selecting Fresno County exposes the county-wide option plus city options and shows the `Create a new Local Address Base` CTA
+  - BAL recovery opens from the home screen
+  - the recovery modal renders the same selector and loads California county options locally
+  - selecting Fresno County exposes the county-wide option plus city options
+  - recovery currently shows the expected fallback warning when no jurisdiction email preview is available from the local directory lookup, while still leaving `Receive the email` available
+- Polished the structured selector follow-through in `mes-adresses`:
+  - `/new` now accepts `state`, `county`, and `place` query params in addition to the legacy `commune` param
+  - step 1 now preserves the selected jurisdiction when returning from step 2 instead of clearing or auto-bouncing forward again
+  - the shared selector now shows a clearer selected-jurisdiction summary with selection type, path, and county-wide vs place-specific scope text
+  - county-wide recovery selection now keeps its summary/fallback state instead of clearing the selected commune when the county option is re-selected in the third dropdown
+- Verified the selector polish locally in a live browser on `127.0.0.1:3001`:
+  - `/new?state=06&county=06019&place=0614218` reopened Clovis city with the expected California -> Fresno County -> Clovis city summary
+  - the auto-advanced Clovis deep link returned cleanly to step 1 via `Previous` and kept the same state/county/place selection
+  - `/new?state=06&county=06019` reopened the Fresno County county-wide selection with the expected summary
+  - BAL recovery now renders the county-wide summary and backend-directory fallback message after selecting Fresno County county-wide
+- Reduced repeated jurisdiction re-selection when recovering an existing unpublished LAB from `/new`:
+  - `BALRecoveryContext` now supports opening the recovery modal with a preselected jurisdiction
+  - the existing-draft warning on `/new` now opens recovery already scoped to the selected jurisdiction
+  - `RecoverBALCommune` now hydrates its selector/email-preview state from that prefilled jurisdiction when no BAL is already open
+  - browser verification on `127.0.0.1:3001` confirmed the exact path for Clovis city: existing-draft alert -> `Recover a LAB with an email` -> recovery modal opened with California / Fresno County / Clovis city already selected and the selected-jurisdiction summary visible
+  - disposable local Clovis demo/draft BALs used for that verification were deleted afterward, returning local search count for `0614218` to zero
+
+### April 2, 2026
+
+- Reused the new structured jurisdiction selector in `mes-adresses` BAL recovery:
+  - recovery now uses the same state -> county -> city/place picker as the create-BAL flow
+  - removed the last frontend usages of the legacy free-text commune search components
+  - kept the county-wide recovery path intact by preserving the county option for unincorporated-area jurisdictions
+- Hardened the new structured selector and recovery UX in `mes-adresses`:
+  - selector list endpoints now surface real fetch failures instead of silently collapsing to empty lists
+  - selector UI now shows retryable load errors and an explicit no-places-found message when only the county-wide option is available
+  - BAL recovery now warns when it cannot preview a jurisdiction email address but still lets the backend recovery lookup continue
+- Browser-pass follow-up:
+  - Docker-backed Postgres/Redis started successfully and a trivial local Python server bound ports normally
+  - initial local browser verification was blocked at this point because both `mes-adresses` and `mes-adresses-api` still appeared to idle before binding ports
+- Machine/tooling follow-up:
+  - switched macOS developer tools from full Xcode to Command Line Tools with `xcode-select`
+  - nested git repos now work normally again
+  - local `jest` still appears to spend excessive time crawling files in this environment, so automated verification remains a separate follow-up task
+
 ### March 27, 2026
 
 - Added an explicit local US-mode startup guard in `api-depot` file storage:
@@ -173,6 +229,11 @@ Last updated: March 27, 2026
 - Added focused file-storage tests in `api-depot` for:
   - the local US-mode S3 guard path
   - the database fallback path in `FileService`
+- Replaced the create-BAL step-1 free-text jurisdiction search with a structured state -> county -> city/place selector in `mes-adresses`:
+  - added new `mes-adresses-api` list endpoints for states, counties by state, and places by county
+  - selector defaults to the county option for county-wide / unincorporated-area LABs
+  - `findCommune` / jurisdiction payloads now include `stateFips` and `countyFips` so deep links can prefill the selector
+- Added focused `mes-adresses-api` unit coverage for the new selector data paths in `commune.service.spec.ts`
 - Verification caveat on this machine:
   - Node `22` is now available locally and `.nvmrc` pins the workspace accordingly
   - in this Codex shell, commands still need `source ~/.nvm/nvm.sh && nvm use 22` before running Node-based tooling
