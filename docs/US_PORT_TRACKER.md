@@ -10,7 +10,7 @@ Last updated: April 12, 2026
 
 ## Current Heads
 
-- `mes-adresses`: `us-port` at `1b9e4f06`
+- `mes-adresses`: `us-port` at `d47d5c1f`
 - `mes-adresses-api`: `us-port` at `f56f934`
 - `api-depot`: `us-port` at `7538240`
 
@@ -87,6 +87,7 @@ Last updated: April 12, 2026
 - BAL recovery now reuses the current jurisdiction from read-only and locked BAL-page actions instead of asking the user to reselect it.
 - Read-only BAL recovery actions now use consistent "Recover admin access" wording across banners, inline alerts, and locked action buttons.
 - Authorization-renewal messaging is now aligned across status badges, publish actions, BAL goal panels, and publication help.
+- Publication safeguard confirmations now use the same "current published LAB" / "full jurisdiction" wording as the rest of the publish flow.
 
 ## Next
 
@@ -183,6 +184,9 @@ Last updated: April 12, 2026
   - the no-authorization status badge now uses "Authorization needed" language
   - action buttons now say "Renew authorization" where the BAL already exists but needs a valid authorization again
   - publication help now describes the expired-authorization state with the same wording
+- Aligned remaining publication safeguard wording:
+  - the conflicted sync confirmation now explains that the LAB will become the current published LAB for the jurisdiction
+  - the large-deletion warning now refers more clearly to the full jurisdiction scope and the current National Address Platform address set
 
 ### April 11, 2026
 
