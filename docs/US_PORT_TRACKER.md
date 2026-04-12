@@ -1,6 +1,6 @@
 # US Port Tracker
 
-Last updated: April 11, 2026
+Last updated: April 12, 2026
 
 ## Current Call
 
@@ -10,7 +10,7 @@ Last updated: April 11, 2026
 
 ## Current Heads
 
-- `mes-adresses`: `us-port` at `d39c7ba5`
+- `mes-adresses`: `us-port` at `49e7cea0`
 - `mes-adresses-api`: `us-port` at `f56f934`
 - `api-depot`: `us-port` at `7538240`
 
@@ -84,6 +84,8 @@ Last updated: April 11, 2026
 - BAL help/tutorial copy now matches the structured `state -> county -> city/place` selector and the county-wide path in the US port.
 - The replaced-sync status message now uses the US support address and clearer takeover guidance.
 - Publication help and the BAL publication goal now use the same US conflict/takeover guidance as the rest of the publish flow.
+- BAL recovery now reuses the current jurisdiction from read-only and locked BAL-page actions instead of asking the user to reselect it.
+- Read-only BAL recovery actions now use consistent "Recover admin access" wording across banners, inline alerts, and locked action buttons.
 
 ## Next
 
@@ -166,6 +168,16 @@ Last updated: April 11, 2026
 - Only treat Phase 1 as release-ready when all launch-critical checkboxes are complete.
 
 ## Session Notes
+
+### April 12, 2026
+
+- Extended jurisdiction-prefilled recovery beyond `/new` into BAL read-only flows:
+  - read-only warning, BAL home read-only recovery, and locked street/number/place-name actions now all use `openRecovery({ commune })`
+  - BAL recovery still opens without a prefill from the home card/help CTA where no current jurisdiction is in context
+  - removed the remaining direct component-level `setIsRecoveryDisplayed(true)` calls outside the recovery context itself
+- Standardized the recovery CTA wording across BAL read-only surfaces:
+  - fixed bottom warning, inline read-only alert, and lock-button tooltip now consistently refer to "Recover admin access"
+  - read-only copy now explains more directly that the BAL is read-only because the user is not signed in as an administrator
 
 ### April 11, 2026
 
