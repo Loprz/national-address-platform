@@ -10,7 +10,7 @@ Last updated: April 12, 2026
 
 ## Current Heads
 
-- `mes-adresses`: `us-port` at `49e7cea0`
+- `mes-adresses`: `us-port` at `1b9e4f06`
 - `mes-adresses-api`: `us-port` at `f56f934`
 - `api-depot`: `us-port` at `7538240`
 
@@ -86,6 +86,7 @@ Last updated: April 12, 2026
 - Publication help and the BAL publication goal now use the same US conflict/takeover guidance as the rest of the publish flow.
 - BAL recovery now reuses the current jurisdiction from read-only and locked BAL-page actions instead of asking the user to reselect it.
 - Read-only BAL recovery actions now use consistent "Recover admin access" wording across banners, inline alerts, and locked action buttons.
+- Authorization-renewal messaging is now aligned across status badges, publish actions, BAL goal panels, and publication help.
 
 ## Next
 
@@ -178,6 +179,10 @@ Last updated: April 12, 2026
 - Standardized the recovery CTA wording across BAL read-only surfaces:
   - fixed bottom warning, inline read-only alert, and lock-button tooltip now consistently refer to "Recover admin access"
   - read-only copy now explains more directly that the BAL is read-only because the user is not signed in as an administrator
+- Aligned authorization-renewal guidance across the BAL publication surfaces:
+  - the no-authorization status badge now uses "Authorization needed" language
+  - action buttons now say "Renew authorization" where the BAL already exists but needs a valid authorization again
+  - publication help now describes the expired-authorization state with the same wording
 
 ### April 11, 2026
 
