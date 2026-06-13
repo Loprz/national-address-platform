@@ -11,7 +11,7 @@ Last updated: June 12, 2026
 ## Current Heads
 
 - `mes-adresses`: `us-port` at `d47d5c1f`
-- `mes-adresses-api`: `us-port` at `8f82733`
+- `mes-adresses-api`: `us-port` at `682e19e`
 - `api-depot`: `us-port` at `31c49b7`
 
 Note: the workspace was moved out of iCloud-synced Desktop to
@@ -101,7 +101,15 @@ are local-only on `us-port` pending push.
 
 ## Next
 
-- Confirm external inbox receipt for the Resend-backed BAL creation email if we want the same human-level confirmation we now have for the Fresno County PIN flow.
+- Confirm `RESEND_API_KEY` and `RESEND_FROM` are set on the production
+  `mes-adresses-api` Railway service. A June 12 production test of the
+  BAL-creation email (`POST /v2/bases-locales` -> `200`) did not deliver to an
+  external Gmail inbox, which means production was silently using the dev
+  stream transport (no real send). `mes-adresses-api` `682e19e` hardens the
+  transactional email service so a deployed env without a transport now returns
+  `503` instead of silently dropping mail — after deploy, verify the Resend env
+  vars are set (check the Resend dashboard Emails log) and re-run the
+  BAL-creation email test for human-level inbox confirmation.
 
 ## Blocked
 
@@ -211,7 +219,23 @@ are local-only on `us-port` pending push.
   `api-depot` deps, and reconnected the workspace.
 - Added `scripts/repair-git-refs.sh` and `scripts/commit-api-depot-storage-guard.sh`
   as repeatable helpers for the ref repair and the tests-first commit.
-- Both new commits are local-only on `us-port` pending push.
+- Pushed all three repos to origin: `mes-adresses-api` `8f82733`, `api-depot`
+  `31c49b7`, and the main `national-address-platform` repo (`734ea7e`).
+  Resolved a push auth issue where the macOS Keychain supplied a work GitHub
+  account; remotes now carry the `Loprz@` username so the correct credential is
+  used.
+- Ran a real production BAL-creation email test to confirm Resend delivery:
+  `POST /v2/bases-locales` for Fresno County to an external Gmail returned
+  `200` (disposable BAL `6a2cd9543f4e946ed675b67e`) but no email arrived. Root
+  cause is the transactional email service silently using the dev stream
+  transport when it failed to detect the deployed environment.
+- Hardened `TransactionalEmailService` (`mes-adresses-api` `682e19e`): robust
+  production/Railway detection (`NODE_ENV`, `RAILWAY_ENVIRONMENT[_NAME]`, and any
+  `RAILWAY_*` runtime id) so a deployed env without SMTP/Resend returns `503`
+  instead of silently dropping mail, plus a loud `WARN` on the local stream
+  transport. Added tests; added `scripts/commit-email-hardening.sh`.
+- Outstanding real-world step: confirm/set `RESEND_API_KEY` / `RESEND_FROM` on
+  the production API service so the BAL-creation email actually delivers.
 
 ### April 12, 2026
 
