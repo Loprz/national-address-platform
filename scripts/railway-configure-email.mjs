@@ -245,23 +245,33 @@ async function main() {
   console.log('Updated Railway variables for the target service.');
 
   if (triggerDeploy) {
-    await gql(
-      railwayToken,
-      `
-        mutation deploymentTrigger($input: DeploymentTriggerInput!) {
-          deploymentTrigger(input: $input) {
-            id
+    // Variables are already updated above. The deploy trigger is best-effort:
+    // Railway's GraphQL schema for this has changed over time, so on any failure
+    // we fall back to instructing a manual redeploy rather than crashing.
+    try {
+      await gql(
+        railwayToken,
+        `
+          mutation serviceInstanceDeployV2(
+            $serviceId: String!
+            $environmentId: String!
+          ) {
+            serviceInstanceDeployV2(
+              serviceId: $serviceId
+              environmentId: $environmentId
+            )
           }
-        }
-      `,
-      {
-        input: {
-          serviceId,
-          environmentId,
-        },
-      },
-    );
-    console.log('Triggered a new deploy for the target service.');
+        `,
+        { serviceId, environmentId },
+      );
+      console.log('Triggered a new deploy for the target service.');
+    } catch (error) {
+      console.warn(
+        `Variables were updated, but the deploy could not be triggered via the API (${error.message}).`,
+      );
+      console.warn('Redeploy manually so the new variables take effect:');
+      console.warn('  ( cd mes-adresses-api && railway redeploy )');
+    }
   } else {
     console.log('TRIGGER_DEPLOY=0, so no deploy was triggered.');
   }

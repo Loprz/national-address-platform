@@ -98,18 +98,27 @@ are local-only on `us-port` pending push.
 - Fixed S3 error propagation so the local US-mode reason reaches callers (`description` moved into the `HttpException` response body for `getS3Client`/`writeFile`/`getFile`).
 - Repaired the `api-depot` `us-port` branch ref after an iCloud conflict-copy (`us-port 2`) and stale lock corrupted it.
 - Moved the workspace off iCloud-synced Desktop to `~/dev/BaseAdresseNationale` to stop the recurring ref corruption and `node_modules` eviction.
+- Resolved the production BAL-creation email gap: set `RESEND_API_KEY` and
+  `RESEND_FROM=noreply@ryanlopez.tech` on the production `mes-adresses-api`
+  Railway service (`enchanting-heart`/`production`) via
+  `scripts/railway-configure-email.mjs`, redeployed, and confirmed delivery in
+  the Resend Emails log (subject "New Local Address Base created", Sent ->
+  Delivered to `ryanclopez1@gmail.com`). This closes the last open Phase 1 item.
 
 ## Next
 
-- Confirm `RESEND_API_KEY` and `RESEND_FROM` are set on the production
-  `mes-adresses-api` Railway service. A June 12 production test of the
-  BAL-creation email (`POST /v2/bases-locales` -> `200`) did not deliver to an
-  external Gmail inbox, which means production was silently using the dev
-  stream transport (no real send). `mes-adresses-api` `682e19e` hardens the
-  transactional email service so a deployed env without a transport now returns
-  `503` instead of silently dropping mail — after deploy, verify the Resend env
-  vars are set (check the Resend dashboard Emails log) and re-run the
-  BAL-creation email test for human-level inbox confirmation.
+- Improve email inbox placement. Production BAL-creation emails now deliver, but
+  Gmail routes them to Spam ("similar to messages identified as spam in the
+  past" — driven partly by a burst of identical June 13 test sends on a fresh
+  sending domain). `ryanlopez.tech` has verified SPF + DKIM but no DMARC. Add a
+  DMARC TXT record (`_dmarc` -> `v=DMARC1; p=none; rua=mailto:dmarc@ryanlopez.tech`),
+  mark the test messages "Not spam", and warm up the domain with consistent
+  legitimate volume (a dedicated sending subdomain such as `mail.ryanlopez.tech`
+  is standard practice).
+- (Optional) Deploy `mes-adresses-api` `682e19e` so the email-delivery hardening
+  (loud `503` instead of a silent no-op when no transport is configured) is live
+  in production. The current production instance delivers email correctly with
+  the Resend vars set; the hardening is a safety net against future misconfig.
 
 ## Blocked
 
