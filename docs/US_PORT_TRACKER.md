@@ -1,6 +1,6 @@
 # US Port Tracker
 
-Last updated: April 12, 2026
+Last updated: June 12, 2026
 
 ## Current Call
 
@@ -11,8 +11,13 @@ Last updated: April 12, 2026
 ## Current Heads
 
 - `mes-adresses`: `us-port` at `d47d5c1f`
-- `mes-adresses-api`: `us-port` at `f56f934`
-- `api-depot`: `us-port` at `7538240`
+- `mes-adresses-api`: `us-port` at `8f82733`
+- `api-depot`: `us-port` at `31c49b7`
+
+Note: the workspace was moved out of iCloud-synced Desktop to
+`~/dev/BaseAdresseNationale` to stop recurring git ref corruption and
+`node_modules` eviction. The `mes-adresses-api` and `api-depot` commits above
+are local-only on `us-port` pending push.
 
 ## Done
 
@@ -88,6 +93,11 @@ Last updated: April 12, 2026
 - Read-only BAL recovery actions now use consistent "Recover admin access" wording across banners, inline alerts, and locked action buttons.
 - Authorization-renewal messaging is now aligned across status badges, publish actions, BAL goal panels, and publication help.
 - Publication safeguard confirmations now use the same "current published LAB" / "full jurisdiction" wording as the rest of the publish flow.
+- The structured jurisdiction selector backend is committed in `mes-adresses-api` (`8f82733`): `/states`, `/states/:stateFips/counties`, and `/counties/:countyFips/places` endpoints with their DTOs, a `getSelectablePlacesByCounty` helper for multi-county Census places, and `stateFips`/`countyFips` on commune extra-data, covered by `commune.service.spec.ts`.
+- The local US-mode S3 storage guard is committed in `api-depot` (`31c49b7`): non-production US-profile mode skips S3 when `S3_*` is missing and serves uploads from the database fallback, with file-storage tests for the guard and DB fallback paths.
+- Fixed S3 error propagation so the local US-mode reason reaches callers (`description` moved into the `HttpException` response body for `getS3Client`/`writeFile`/`getFile`).
+- Repaired the `api-depot` `us-port` branch ref after an iCloud conflict-copy (`us-port 2`) and stale lock corrupted it.
+- Moved the workspace off iCloud-synced Desktop to `~/dev/BaseAdresseNationale` to stop the recurring ref corruption and `node_modules` eviction.
 
 ## Next
 
@@ -170,6 +180,38 @@ Last updated: April 12, 2026
 - Only treat Phase 1 as release-ready when all launch-critical checkboxes are complete.
 
 ## Session Notes
+
+### June 12, 2026
+
+- Resumed after a disconnected session and finished work that was left
+  uncommitted or hidden by a broken branch ref.
+- Committed the structured jurisdiction selector backend in `mes-adresses-api`
+  (`8f82733`): new `/states`, `/states/:stateFips/counties`, and
+  `/counties/:countyFips/places` endpoints, the `JurisdictionState/County/Place`
+  DTOs, a `getSelectablePlacesByCounty` FIPS helper that handles multi-county
+  Census places, and `stateFips`/`countyFips` on commune extra-data. The 6
+  `commune.service.spec.ts` tests pass.
+- Repaired the `api-depot` `us-port` branch: removed an iCloud conflict-copy ref
+  (`us-port 2`) plus stale `us-port.lock`/`HEAD.lock`, repointed `us-port` to
+  `7538240`, and reattached HEAD.
+- Committed the `api-depot` local US-mode S3 guard (`31c49b7`): `S3Service`
+  skips S3 client setup in non-production US-profile mode when `S3_*` is missing
+  and uploads fall back to database storage; `FileService` stores and reads BAL
+  content from the DB when S3 is unavailable. Documented in `.env.sample` and
+  `README.md`.
+- Fixed an error-propagation bug surfaced by the new `s3.service.spec.ts`: the
+  local US-mode reason was passed as the `HttpException` options `description`,
+  which never reaches `getResponse()`, so callers received a bare string. Moved
+  the description into the response body for `getS3Client`, `writeFile`, and
+  `getFile`. Both file-module specs pass.
+- Resolved the root cause of the recurring git/test corruption: the project
+  lived in iCloud-synced Desktop, which created conflict-copy refs and evicted
+  `node_modules` to dataless placeholders. Moved it to
+  `~/dev/BaseAdresseNationale` (outside iCloud) via rsync, reinstalled
+  `api-depot` deps, and reconnected the workspace.
+- Added `scripts/repair-git-refs.sh` and `scripts/commit-api-depot-storage-guard.sh`
+  as repeatable helpers for the ref repair and the tests-first commit.
+- Both new commits are local-only on `us-port` pending push.
 
 ### April 12, 2026
 
