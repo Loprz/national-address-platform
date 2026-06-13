@@ -115,10 +115,11 @@ are local-only on `us-port` pending push.
   mark the test messages "Not spam", and warm up the domain with consistent
   legitimate volume (a dedicated sending subdomain such as `mail.ryanlopez.tech`
   is standard practice).
-- (Optional) Deploy `mes-adresses-api` `682e19e` so the email-delivery hardening
-  (loud `503` instead of a silent no-op when no transport is configured) is live
-  in production. The current production instance delivers email correctly with
-  the Resend vars set; the hardening is a safety net against future misconfig.
+- (Done June 13) Deployed `mes-adresses-api` `682e19e` to production via
+  `railway up`; the email-delivery hardening (loud `503` instead of a silent
+  no-op when no transport is configured) is now live. Post-deploy smoke test
+  confirmed BAL creation returns `200` and the email delivers to the Gmail
+  inbox.
 
 ## Blocked
 
