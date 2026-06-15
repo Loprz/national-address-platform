@@ -1,6 +1,6 @@
 # US Port Tracker
 
-Last updated: June 12, 2026
+Last updated: June 14, 2026
 
 ## Current Call
 
@@ -104,6 +104,243 @@ are local-only on `us-port` pending push.
   `scripts/railway-configure-email.mjs`, redeployed, and confirmed delivery in
   the Resend Emails log (subject "New Local Address Base created", Sent ->
   Delivered to `ryanclopez1@gmail.com`). This closes the last open Phase 1 item.
+
+## i18n — PICKUP POINT (next session start here)
+
+Status as of June 14, 2026: **17 i18n batches complete; the user-facing tail is
+done.** 155/272 `mes-adresses` components on `next-intl`, catalogs at **1023
+leaf keys** with en/es at exact parity. The 80 remaining non-`signalement`
+`.tsx` files were verified to contain **no user-facing strings** (they are
+contexts/layouts/pure-render components — only `"use client"` directives,
+`Promise` calls, code comments, and CSS-in-JS remain). Every primary and
+secondary user surface outside Phase 2 reports is now internationalized.
+
+Batches 13–17 this session (all verified: JSON valid, en/es parity, and every
+`t("key")` call resolves against the catalog via a codebase-wide check):
+
+- Batch 13 (legal + error pages): `accessibilite/page` and `mentions-legales/page`
+  (full static legal copy via `t.rich` with `b`/`link` renderers), `not-found`.
+  Namespaces `accessibility`, `legalNotice`, `notFound`.
+- Batch 14 (map popups + markers): `popup-feature-numero/-toponyme/-voie/-panoramax`,
+  `numero-marker` (fixed French+typo `"Cette adresse est certifiede"`),
+  `numeros-markers` archive toasts. Namespaces `mapPopup`, `mapMarker`. ICU for
+  the `{certified}/{total} certified` counter.
+- Batch 15 (trash cluster): `trash/index`, `list/items-deleted-list`,
+  `restore-voie/index`, `restore-voie/list-numeros-deleted`. New `trash`
+  namespace with ICU plurals for all the `number(s)` composed strings.
+- Batch 16 (misc small components): home-drawer (index/news-tab/training-tab),
+  `ie-warning`, `mini-card` (French alt), `mobile-help-menu`, `stepper`,
+  `text-wrapper` (French `"En savoir plus"` default), `certification-button`,
+  `comment`, `commune-flag`, `disabled-form-input`, `read-only-warning`,
+  `breadcrumbs`, `table-row-actions`, `langues-regionales-form` + `language-field`
+  (French `"Nom en …"` placeholder), `bal-recovery` + `recover-bal-alert`.
+  Reused `nav.home`, `common.actions`, `home.upcomingTrainings/news`,
+  `dialogs.jurisdictionLogo`; added `common.learnMore` and namespaces
+  `certificationButton`, `comment`, `disabledFormInput`, `readOnlyWarning`,
+  `homeDrawer`, `ieWarning`, `mobileHelp`, `stepper`, `miniCard`,
+  `languesRegionales` + recovery keys in `dialogs`.
+- Batch 17 (contexts + layouts): `contexts/draw` (drawing-hint tooltips +
+  `{length} m`), `contexts/bal-data` (sync-detected toast + loading overlay),
+  `contexts/bal-widget` (iframe title), `layouts/editor` (loading overlay),
+  `layouts/sidebar` (open/close/hide titles). Namespaces `draw`, `balData`,
+  `balWidget`, plus `sidebar` additions. Also anglicized the French Matomo
+  analytics category identifiers in `contexts/matomo-tracking` (`"Carte"`→`"Map"`,
+  `"Page d'accueil"`→`"Home Page"`) — these are internal analytics constants, not
+  i18n strings.
+
+**Intentionally left in English:** `app/global-error.tsx` ("An error has
+occurred." / "Try again") — it replaces the root layout on a crash and renders
+*outside* `NextIntlClientProvider`, so `useTranslations` would throw there.
+
+**Done (June 14):** `date-fns` is now locale-aware. Added `getDateFnsLocale()`
+in `lib/utils/date.ts` (maps the active next-intl locale → date-fns `enUS`/`es`),
+fixed `getFullDate` which was hardcoded to the French `fr` locale, and threaded
+the active locale through `base-locale-card` (`formatDistanceToNow`) and the two
+home-drawer tabs (`getFullDate`) via `useLocale()`. (`getDuration` /
+`getLongFormattedDate` are only used by `signalement/*`, deferred to Phase 2.)
+Verified with `npx tsc --noEmit` → 0 errors.
+
+**First thing to do in the next chat — build & verify locally** (the cowork
+sandbox has no persistent `node_modules`, so the human runs this; an earlier
+`rm -rf .next` was needed once to clear stale iCloud `* 2.ts` dup files):
+
+```bash
+cd ~/dev/BaseAdresseNationale/mes-adresses
+rm -rf .next
+yarn install
+# expected: 0 errors  (keep the comment on its own line — an inline
+# `# expecting 0 errors` after the command leaks into tsc as bogus root
+# files and produces phantom TS6231 "Could not resolve the path '#'" errors)
+npx tsc --noEmit
+yarn build
+```
+
+Note: `tsc --noEmit` has been passing clean after every batch (verified in the
+sandbox against installed deps). If the build surfaces anything, it'll most
+likely be ESLint exhaustive-deps warnings (non-blocking) — `t` was added to
+hook dep arrays throughout, but spot-check if a hook complains.
+
+**Verification helper** (run in `mes-adresses/`) to confirm catalog parity +
+that every `t("key")` resolves before/after a batch:
+
+```bash
+python3 - <<'PY'
+import json,re,glob
+en=json.load(open('messages/en.json')); es=json.load(open('messages/es.json'))
+def keys(o,p=''):
+    s=set()
+    for k,v in o.items():
+        n=p+'.'+k if p else k
+        s|=keys(v,n) if isinstance(v,dict) else {n}
+    return s
+ek,sk=keys(en),keys(es)
+print('PARITY','OK' if ek==sk else f'MISMATCH {sorted(ek^sk)}','| leaves',len(ek))
+PY
+```
+
+**What's done:** every primary user surface — home/list, create flow, the three
+editors + sub-components, publication/authorization/success, help drawer, map
+controls, settings, document generation, sub-header + sidebar chrome, status
+badge/sync (incl. `lib/statuses.ts` + `positions-types-list.ts`), goal/summary
+panels, list rows + page shells, top-level dialogs + recovery flows. Also fixed
+11 stray French strings the original find-replace missed.
+
+**What's left (the tail, lower-traffic):** ~117 non-`signalement` `.tsx` files —
+misc small components, a few legal/static pages (`mentions-legales`,
+`accessibilite`), the breadcrumbs wrapper, and other odds and ends. Find them
+with:
+
+```bash
+comm -23 <(find src -name '*.tsx' | grep -v '/signalement/' | sort) \
+        <(grep -rIl 'next-intl' src --include=*.tsx | sort)
+```
+
+**Still deferred:** `signalement/*` (37 files) — Phase 2 reports, intentionally
+out of scope. **Enhancement still open:** switch the `date-fns` locale by the
+active locale (currently hardcoded `enUS` in `base-locale-card`).
+
+## Internationalization (i18n)
+
+Goal: English now, other languages portable later. `next-intl` is wired
+(`src/i18n/routing.ts` + `request.ts`, locales `en`/`es`, `localePrefix:
+as-needed`), with message catalogs at `messages/en.json` (source of truth) and
+`messages/es.json` (mirror). English catalog is authoritative; Spanish is
+machine-authored and can be revised by a native reviewer without code changes.
+
+Convention: one namespace per component (camelCase keys), reuse shared
+namespaces (`common`, `address`) for generic single words, ICU `{var}` for
+interpolation, ICU `plural` for counts, and `t.rich(...)` with tag renderers
+(`b`, `s`, `br`, `link`) for inline markup/links.
+
+### i18n progress (June 13, 2026)
+
+- Catalogs grown from 174 to 282 leaf keys; en/es kept at exact parity.
+- 14 components migrated off hardcoded English this session, verified by a
+  parity + key-resolution script (no `node_modules` in the cowork workspace, so
+  `tsc`/`next build` must be run locally to confirm types):
+  - Batch 1 (core authoring): `demo-warning`, `welcome-message`,
+    `grouped-actions`, `base-locale-card`, `bal/address-editor`. Also fixed two
+    French strings the earlier find-replace missed (`Sauvegarder`, `Adresses de`).
+  - Batch 2 (create flow): `new/steps/import-data-step`,
+    `new/steps/bal-infos-step`.
+  - Batch 3 (authorization, bounded files): `strategy-selection/code-email`,
+    `strategy-selection/index`, `strategy-selection/pro-connect`,
+    `validate-authentication/code-validation`, `validate-authentication/index`,
+    `steps/publish-bal-rejected`, `steps/authentication_rejected`.
+  - Batch 4 (help/tutorial drawer, all of `components/help/*`): `help/index`,
+    `video-container`, `help-tabs/index` (TABS now i18n keys), `problems`,
+    `tuto/unauthorized`, `tuto/sidebar`, and the five tab content files
+    `help-tabs/base-locale`, `voies`, `toponymes`, `numeros`, `publication`.
+    Inline illustrative buttons/menu-items were split into their own keys;
+    `t.rich` used only for `<b>`/`<i>`/`<s>` emphasis and links.
+  - Batch 5 (map controls, settings, document generation): all of
+    `map/controls/*` (style, boundary, cadastre, panoramax, image, ruler,
+    address-editor, geolocation), all of `settings/*` (index, bal-admin-emails,
+    fond-de-carte form/field/dialog/list, share clipboard/qr/access-dialog),
+    and `document-generation/*` (certificat + arrete dialogs, numero/voie
+    generated-documents menus). Namespaces `mapControls`, `settings`, `docGen`.
+  - Batch 6 (publication-conflict cluster — previously deferred): the full
+    publish/takeover flow is now internationalized end to end —
+    `habilitation-process/index.tsx`, `steps/publish-bal.tsx` (conflict modal +
+    SVG diagram labels), `steps/published-bal.tsx` (success screen), all of
+    `new/alert-published-bal/*`, and `new/commune-publication-infos.tsx`.
+    Namespaces `publishConflict`, `publishSuccess`, `habilitationProcess`.
+  - Batch 7 (BAL editor forms): the three core editors —
+    `bal/numero-editor.tsx`, `voie-editor.tsx`, `toponyme-editor.tsx` — plus
+    their in-form sub-components `numero-editor/numero-voie-selector`,
+    `numero-editor/select-parcelles`, `position-editor`,
+    `draw-metric-voie-editor`. Shared `editorForm` namespace. Fixed the French
+    `"Suffixe"` placeholder and removed a dead `REMOVE_TOPONYME_LABEL`
+    string-compare. `position-item` left as-is (renders data only; position-type
+    names live in the `positions-types-list` lib file — a separate concern).
+  - Batch 8 (BAL chrome): `sub-header/*` — `bal-status/index` (pause/resume
+    toasts), `ban-sync/index`, `sync-button`, `ban-history` + `revision` +
+    `revision-user`, `refresh-sync-badge`, `settings-menu`, `com-dialog` — and
+    `sidebar/*` — `main-tabs` (tab labels + alts), `populate`. Namespaces
+    `balStatus`, `comDialog`, `sidebar`. Fixed the French
+    `"Synchronisation en cours"` badge. Sample street/place names in
+    `main-tabs` left as-is (illustrative skeleton data, not UI labels).
+  - Batch 9 (lib status + position-type strings): refactored `lib/statuses.ts`
+    so `computeStatus` returns a status `key` + visuals (color/icon/intent)
+    instead of English label/title/content; added the `balStatusInfo` catalog
+    namespace (label/title/content for all 8 statuses) and translate in
+    `status-badge` and `ban-sync/index`. Position-type names: `position-item`
+    and `grouped-actions` now translate via the existing `positionTypes`
+    namespace keyed by the type `value`; `lib/positions-types-list.ts` keeps its
+    English exports for the (Phase 2) signalement consumers.
+  - Batch 10 (goal/summary panels): `bal/panel-goal/*` (publication, certification,
+    quality, toponyme + lang secondary goals, accordion index) and the
+    jurisdiction-tab panels `bal-summary`, `certification-infos`,
+    `commune-noms-alt-editor`, `language-preview`, `read-only-infos`. New
+    `panels` namespace with ICU plurals for the counters. Fixed French
+    `"Objectifs secondaires"` and `" en {lang}"`. `star-rating`,
+    `accordion-simple`, `achievements-badge`, `address-preview` need no strings.
+  - Batch 11 (list rows + page shells): `voie/*` (numeros-list, voie-heading,
+    voie-page, voie-numeros-page), `toponyme/*` (toponyme-heading, -page,
+    -numeros-page, add-numeros + add-numeros-input/-with-voie/-with-polygon),
+    and the page shells `app/bal/[balId]/voies/page.tsx` +
+    `toponymes/page.tsx`. New `lists` namespace with ICU plurals for number/
+    position/selection counts. Fixed French `"Consulter"`, `"Voies"`, `"Voie"`.
+    `signalements` page shells stay deferred (Phase 2).
+  - Batch 12 (top-level dialogs + route shells): `renew-token-dialog`,
+    `delete-warning`, `dialog-warning-action`, `mass-deletion-dialog`,
+    `downloads`, `uploader`, `bal-recovery/recover-bal-mail` +
+    `recover-bal-commune`, and the `voies/new` + `toponymes/new` route shells.
+    New `dialogs` namespace (+ `lists.newStreet`/`newPlaceName`). Fixed a real
+    bug: `uploader` ignored its `loadingLabel` prop and hardcoded French
+    `"Analyse en cours"` — now uses the prop with a translated fallback.
+- Catalogs now at 913 leaf keys (en/es parity). Verified locally with a full
+  `npx tsc --noEmit` → **0 errors** after Batch 12 (June 13, 2026). 118 of 272
+  components now use `next-intl`.
+
+- Verified locally: `yarn install` + `npx tsc --noEmit` passes with **0 errors**
+  after the migration (confirmed June 13, 2026).
+- Fixed 3 pre-existing type errors surfaced by the typecheck (unrelated to
+  i18n, in files not touched by the migration):
+  - `app/bal/[balId]/voies/page.tsx`: `openRecovery({ commune })` referenced a
+    `commune` not in scope — added `commune` to the `BalDataContext` destructure
+    (matching `toponymes/page.tsx`).
+  - `components/jurisdiction-selector.tsx`: replaced an unsafe
+    `nextCommune as CommuneType` cast with a spread that supplies safe defaults
+    for the BAL-only fields ApiGeo doesn't return (`isCOM`, `hasParcels`,
+    `hasOpenMapTiles`, `hasOrtho`, `hasPlanIGN`, `communesDeleguees`).
+  - Note: stale `.next/dev/types/*" 2".ts` iCloud conflict-copies caused 6
+    phantom errors; `rm -rf .next` clears them.
+
+### i18n remaining
+
+- **User-facing tail complete (June 14, 2026).** 155 of 272 components use
+  `next-intl`; catalogs at 1023 leaf keys (en/es parity). The 80 remaining
+  non-`signalement` `.tsx` files were verified to contain no user-facing strings
+  (contexts/layouts/pure-render components — only `"use client"`, `Promise`
+  calls, comments, and CSS-in-JS), so they need no migration.
+- `app/global-error.tsx` deliberately stays English: it renders outside
+  `NextIntlClientProvider` (root-layout crash fallback) where `useTranslations`
+  would throw.
+- `signalement/*` (37 files) intentionally deferred — Phase 2 (reports).
+- (Done June 14) `date-fns` is now locale-aware via `getDateFnsLocale()` in
+  `lib/utils/date.ts`; `base-locale-card` and the home-drawer tabs pass the
+  active locale, and `getFullDate`'s hardcoded French `fr` locale was fixed.
 
 ## Next
 
