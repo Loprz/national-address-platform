@@ -341,17 +341,40 @@ interpolation, ICU `plural` for counts, and `t.rich(...)` with tag renderers
 - (Done June 14) `date-fns` is now locale-aware via `getDateFnsLocale()` in
   `lib/utils/date.ts`; `base-locale-card` and the home-drawer tabs pass the
   active locale, and `getFullDate`'s hardcoded French `fr` locale was fixed.
+- (Done June 14) Added a repeatable Spanish-locale spot check:
+  `mes-adresses/scripts/check-i18n.mjs` (run `yarn check-i18n`). It validates
+  en↔es key parity, ICU **argument** parity (AST-based via
+  `@formatjs/icu-messageformat-parser`, so it ignores `select`/`plural` branch
+  text), plural `other`-category completeness, and empty values; it warns (does
+  not fail) on es values identical to en. Current result: **1023/1023 keys, 0
+  errors, 2 benign warnings** (`help.tutorial`="Tutorial", `mapControls.styleOSM`
+  ="OpenStreetMap" — both legitimately identical).
 
 ## Next
 
-- Improve email inbox placement. Production BAL-creation emails now deliver, but
-  Gmail routes them to Spam ("similar to messages identified as spam in the
-  past" — driven partly by a burst of identical June 13 test sends on a fresh
-  sending domain). `ryanlopez.tech` has verified SPF + DKIM but no DMARC. Add a
-  DMARC TXT record (`_dmarc` -> `v=DMARC1; p=none; rua=mailto:dmarc@ryanlopez.tech`),
-  mark the test messages "Not spam", and warm up the domain with consistent
-  legitimate volume (a dedicated sending subdomain such as `mail.ryanlopez.tech`
-  is standard practice).
+- Improve email inbox placement. **DNS re-checked June 14 — auth is actually
+  fully configured**, contrary to the earlier "no DMARC" note:
+  - DNS is hosted at **Hostinger** (`ns1/ns2.dns-parking.com`); edit records in
+    hPanel → Domains → DNS / Nameservers.
+  - Resend sends with an SPF-aligned Return-Path on `send.ryanlopez.tech`
+    (`v=spf1 include:amazonses.com ~all`, MX `feedback-smtp.us-east-1.amazonses.com`)
+    and DKIM-signs as `d=ryanlopez.tech` (root `resend._domainkey` present), so
+    **DMARC passes via DKIM alignment**.
+  - A DMARC record **already exists**: `_dmarc.ryanlopez.tech = "v=DMARC1; p=none"`.
+  - So the Gmail-Spam issue is **reputation, not authentication** (fresh domain +
+    the burst of identical June 13 test sends), exactly as suspected.
+  - Remaining actions (all optional / non-blocking):
+    - (Recommended, DNS) Add aggregate reporting for visibility — update
+      `_dmarc.ryanlopez.tech` to
+      `v=DMARC1; p=none; rua=mailto:dmarc@ryanlopez.tech; fo=1`, and create a
+      `dmarc@ryanlopez.tech` mailbox/forward at Hostinger to receive the reports.
+    - (Gmail) Open the spam-foldered test messages and click **Not spam** to
+      train the filter; reply/star a couple to add positive signal.
+    - (Reputation) Warm up with consistent, low, non-identical legitimate volume
+      over days; avoid bursts of identical test emails. A dedicated sending
+      subdomain (e.g. `mail.ryanlopez.tech`) is standard practice if volume grows.
+    - (Monitoring, optional) Register `ryanlopez.tech` in Google Postmaster Tools
+      to watch domain/IP reputation and spam rate.
 - (Done June 13) Deployed `mes-adresses-api` `682e19e` to production via
   `railway up`; the email-delivery hardening (loud `503` instead of a silent
   no-op when no transport is configured) is now live. Post-deploy smoke test
