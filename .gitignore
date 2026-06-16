@@ -44,3 +44,9 @@ Thumbs.db
 *.dbf
 *.shx
 *.prj
+
+# Local artifacts / backups (not for VCS)
+.playwright-cli/
+output/
+tmp/
+_phase2_api_backup_*/
