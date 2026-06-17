@@ -112,6 +112,7 @@ With this setup, BAL creation, collaborator invite, recovery, token renewal, pub
 | `NEXT_PUBLIC_MAP_GLYPHS_URL`   | No       | Default Stadia glyphs if unset                                                                                                                                                                                                                             |
 | `NEXT_PUBLIC_ORTHO_TILES_URL`  | No       | Optional aerial imagery                                                                                                                                                                                                                                    |
 | `NEXT_PUBLIC_PARCEL_TILES_URL` | No       | Optional parcel layer                                                                                                                                                                                                                                      |
+| `NEXT_PUBLIC_MAPILLARY_TOKEN`  | No (rec.) | **Street-level imagery.** Mapillary client token (`MLY\|…`, READ scope). Without it the street-imagery control stays disabled ("No territory photography"). **Build-time** — see **Mapillary street imagery** below.                                       |
 | `HOME_DRAWER_NEWS_URL`         | No       | **US demo:** absolute URL returning JSON array of `{ id, message, date }`. When set, replaces Mattermost news. Example: `https://your-app.railway.app/demo/home-drawer-news.json`                                                                          |
 | `HOME_DRAWER_EVENTS_URL`       | No       | **US demo:** absolute URL returning JSON array of events (same shape as [EventType](../mes-adresses/src/lib/bal-admin/type.ts)). When set, replaces bal-admin trainings. Example: `https://your-app.railway.app/demo/home-drawer-events.json`              |
 | `NEXT_PUBLIC_BAN_API_DEPOT`    | No       | **Depot only:** base URL of the depot service (e.g. `https://api-depot-xxx.up.railway.app`). If unset, the frontend derives a URL from `NEXT_PUBLIC_BAL_API_URL` + `/api-depot`, which only works when depot is served at that path (see **Depot** below). |
@@ -130,6 +131,20 @@ The repo includes static demo payloads you can serve from the same app:
 - **Events:** set `HOME_DRAWER_EVENTS_URL` = `https://<your-frontend-domain>/demo/home-drawer-events.json`
 
 Those files under `mes-adresses/public/demo/` contain placeholder content for **NAD**, **Census Bureau**, and **Overture Maps**. You can replace them or point the env vars at your own JSON endpoints (e.g. a small proxy to Census or Overture announcements).
+
+**Mapillary street imagery**
+
+The map editor uses **Mapillary** for street-level imagery (it replaced Panoramax, which has almost no US coverage). The camera control shows a green coverage layer and, on click, an embedded viewer with **click-to-place** (click a front door in the photo to move the address point there).
+
+1. Get a **client token** at [mapillary.com/dashboard/developers](https://www.mapillary.com/dashboard/developers) → **Register an application**. Enable the **READ** scope only (leave WRITE/UPLOAD off — we never write to Mapillary). The token looks like `MLY|<app-id>|<secret>`.
+2. In the **Frontend** (`mes-adresses`) service → **Variables**, set `NEXT_PUBLIC_MAPILLARY_TOKEN` = that token.
+3. **Trigger a full rebuild/redeploy** (not just a Restart).
+
+> ⚠️ **Build-time, not runtime.** `NEXT_PUBLIC_*` values are **inlined into the JavaScript bundle during `yarn build`**, not read when the server runs. The editor builds with **Nixpacks** (no Dockerfile), so Railway service variables are available at build time automatically — but the variable must exist **before** the build runs. If Railway auto-deployed from a push *before* the token was set, that build baked in an empty token and the control will stay disabled; setting the variable triggers a new build that fixes it. Setting it only in your local `.env` does nothing for prod.
+
+To confirm after deploy: open the prod site → DevTools → **Network** → filter `mapillary`. You should see requests to `tiles.mapillary.com/...?access_token=MLY|…`. No Mapillary requests at all = the build didn't get the token (still old build, or var set after build).
+
+The token is public by design (it ships to the browser); keep it **READ-only** so a leaked token can't modify anything. To avoid exposing it entirely, proxy the tiles through the API later — not required to launch.
 
 ---
 
@@ -246,6 +261,7 @@ Launch assumptions:
 - Build from the **US port branch** so the English UI and US wording are present.
 - `NEXT_PUBLIC_API_SIGNALEMENT` may remain set, but reports stay hidden while `NEXT_PUBLIC_REPORTS_ENABLED=false`.
 - Map/parcel/ortho/news/event variables are optional for Phase 1.
+- `NEXT_PUBLIC_MAPILLARY_TOKEN` is recommended so street-level imagery + click-to-place work; it is **build-time**, so set it before the build (see **Mapillary street imagery** in §5).
 
 ### API (`mes-adresses-api`)
 
@@ -381,4 +397,5 @@ You can automate part of the setup with the [Railway GraphQL API](https://docs.r
 - **Links in emails point to wrong URL**: Set `EDITOR_URL_PATTERN` and `API_URL` on the API to the correct public frontend and API URLs.
 - **PostGIS errors**: Run `CREATE EXTENSION IF NOT EXISTS postgis;` in the Postgres database (see step 2).
 - **"type habilitations_status_enum already exists"**: The migration was made idempotent; run `yarn typeorm:migration:run` again (with the same `POSTGRES_URL`). If it still fails, the migration may already be recorded — check the `migrations` table in the DB.
+- **Street imagery shows "No territory photography is available"** (camera control disabled) in an area you know has Mapillary coverage: the build doesn't have a valid Mapillary token. (1) Confirm `NEXT_PUBLIC_MAPILLARY_TOKEN` is set in the **Frontend** service Variables. (2) Trigger a **full rebuild/redeploy** (not Restart) — `NEXT_PUBLIC_*` is inlined at `yarn build`, so a build that ran before the variable existed baked in an empty token. (3) DevTools → Network → filter `mapillary`: requests to `tiles.mapillary.com?access_token=…` = working; requests to `api.panoramax.xyz` or none = still the old build / no token. (4) Make sure the token has the **READ** scope. See **Mapillary street imagery** in §5.
 - **Frontend build fails with "Module not found" in `signalement-form.tsx`** (e.g. `Can't resolve '@/lib/utils/report'` or similar): The fix (import from `@/lib/utils/signalement`) is on the **us-port** branch. In the **Frontend** service → **Settings** → **Source** (or **Build**), set **Production Branch** (or **Branch**) to **us-port**, then trigger a new deploy. Do not build from `main` unless that branch has the same fix.
